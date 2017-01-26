@@ -1,0 +1,254 @@
+<html>
+<head>
+<script type="text/javascript">
+
+function loadShader(name, type) {
+	var script = document.getElementById(name);
+	if (!script)
+		return null;
+	
+	var shader = gl.createShader(type);
+	gl.shaderSource(shader, script.textContent);
+	gl.compileShader(shader);
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		alert(gl.getShaderInfoLog(shader));
+		return null;
+	}
+
+	return shader;
+}
+
+function loadProgram(name) {
+	var program = gl.createProgram();
+	gl.attachShader(program, loadShader(name+"-vs", gl.VERTEX_SHADER));
+	gl.attachShader(program, loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+	gl.linkProgram(program);
+
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+		alert(gl.getProgramInfoLog(program));
+		return null;
+	}
+
+	return program;
+}
+
+function loadBuffer(vertices) {
+	var vbo = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+	return vbo;
+}
+
+var canvas;
+var gl;
+
+var program;
+var buffer;
+var count;
+
+var mouse;
+var mouseDown;
+
+var tx = 0.0;
+var ty = 0.0;
+var s = 1.0;
+
+function convertMouse(x, y) {
+	var mx = 2.0 * x / canvas.width - 1.0;
+	var my = 1.0 - 2.0 * y / canvas.height;
+	return [mx, my];
+}
+
+function onMouseDown(event) {
+	mouseDown = true;
+	mouse = convertMouse(event.clientX, event.clientY);
+}
+
+function onMouseUp(event) {
+	mouseDown = false;
+}
+
+function onMouseMove(event) {
+	var newMouse = convertMouse(event.clientX, event.clientY);
+
+	if (mouseDown) {
+		tx += (newMouse[0] - mouse[0]) / s;
+		ty += (newMouse[1] - mouse[1]) / s;
+	}
+
+	mouse = newMouse;
+
+	if (mouseDown)
+		update();
+}
+
+function onMouseWheel(event) {
+	var d = Math.pow(1.25, event.wheelDelta / 120);
+
+	tx += mouse[0] / s * (1 / d - 1);
+	ty += mouse[1] / s * (1 / d - 1);
+
+	s *= d;
+
+	update();
+}
+
+function buildTree(depth, scale, angle1, angle2) {
+
+	var vertices = new Array((Math.pow(2, depth)-1)*4);
+
+	vertices[0] = 0.0;
+	vertices[1] = 0.0;
+
+	vertices[2] = 0.0;
+	vertices[3] = 1.0;
+
+	for (var d = 1; d < depth; ++d)
+	{
+		for (var i = 0; i < Math.pow(2, d-1); ++i)
+		{
+			var n = Math.pow(2, d-2) - 1 + i;
+			var m = Math.pow(2, d-1) + 2*i;
+
+			var o = [vertices[4*n+2], vertices[4*n+3]];
+			var v = [vertices[4*n+2]-vertices[4*n+0], vertices[4*n+3]-vertices[4*n+1]];
+
+			vertices[4*m+0] = o[0];
+			vertices[4*m+1] = o[1];
+			vertices[4*m+2] = o[0] + (v[0] * Math.cos(angle1) - v[1] * Math.sin(angle1)) * scale;
+			vertices[4*m+3] = o[1] + (v[0] * Math.sin(angle1) + v[1] * Math.cos(angle1)) * scale;
+
+			vertices[4*m+4] = o[0];
+			vertices[4*m+5] = o[1];
+			vertices[4*m+6] = o[0] + (v[0] * Math.cos(angle2) + v[1] * Math.sin(angle2)) * scale;
+			vertices[4*m+7] = o[1] + (- v[0] * Math.sin(angle2) + v[1] * Math.cos(angle2)) * scale;
+		}
+	}
+
+	return vertices;
+}
+
+var depth_input;
+var scale_input;
+var angle1_input;
+var angle2_input;
+
+function rebuildTree() {
+	vertices = buildTree(depth_input.value, scale_input.value, angle1_input.value / 180.0 * Math.PI, angle2_input.value / 180.0 * Math.PI);
+	buffer = loadBuffer(vertices);
+	count = vertices.length / 2;
+}
+
+function initGL() {
+	canvas = document.getElementById("main_canvas");
+	gl = canvas.getContext("experimental-webgl");
+
+	depth_input = document.getElementById("depth");
+	scale_input = document.getElementById("scale");
+	angle1_input = document.getElementById("angle1");
+	angle2_input = document.getElementById("angle2");
+
+	program = loadProgram("shader");
+
+	rebuildTree();
+
+	canvas.onmousedown = onMouseDown;
+	document.onmouseup = onMouseUp;
+	document.onmousemove = onMouseMove;
+	document.onmousewheel = onMouseWheel;
+
+	//setInterval(() => { step(0.016); }, 16);
+}
+
+function update() {
+	paintGL();
+}
+
+function step(dt) {
+	//update();
+}
+
+function paintGL() {
+	var aratio = canvas.width / canvas.height;
+
+	gl.viewport(0, 0, canvas.width, canvas.height);
+
+	gl.clearColor(0, 0, 0.1, 1);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	var mvp = [
+		s/aratio, 0.0, 0.0, 0.0,
+		0.0, s, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		tx*s, ty*s, 0.0, 1.0,
+	];
+
+	gl.useProgram(program);
+
+	gl.uniformMatrix4fv(gl.getUniformLocation(program, "mvp_matrix"), false, mvp);
+	gl.uniform3fv(gl.getUniformLocation(program, "color"), [1.0, 1.0, 1.0]);//[Math.random(), Math.random(), Math.random()]);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+	var loc = gl.getAttribLocation(program, "vertex")
+	gl.enableVertexAttribArray(loc);
+	gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+	gl.drawArrays(gl.LINES, 0, count);
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+	gl.useProgram(null);
+}
+
+</script>
+<script id="shader-vs" type="text/glsl">
+precision mediump float;
+
+attribute vec3 vertex;
+
+uniform mat4 mvp_matrix;
+
+void main(){
+	gl_Position = mvp_matrix * vec4(vertex, 1.0);
+}
+
+</script>
+<script id="shader-fs" type="text/glsl">
+precision mediump float;
+
+uniform vec3 color;
+
+void main(){
+	gl_FragColor = vec4(color, 1.0);
+}
+
+</script>
+</head>
+<body onload="initGL();paintGL();">
+
+<table><tr>
+
+<td>
+<canvas id="main_canvas" width=800 height=600>
+Your browser is a fucking loser.
+</canvas>
+</td>
+
+<td>
+<label>Depth</label>
+<input type="range" id="depth" width="300px" min="1" max="20" step="1" value="5" oninput="rebuildTree();update();" />
+<br/>
+<label>Scale</label>
+<input type="range" id="scale" min="0" max="1" step="0.01" value="0.5" oninput="rebuildTree();update();" />
+<br/>
+<label>Angle 1</label>
+<input type="range" id="angle1" min="0" max="180" step="1" value="30" oninput="rebuildTree();update();" />
+<br/>
+<label>Angle 2</label>
+<input type="range" id="angle2" min="0" max="180" step="1" value="30" oninput="rebuildTree();update();" />
+</td>
+
+</tr></table>
+
+</body>
+</html>
