@@ -1,0 +1,218 @@
+<html>
+<head>
+<script type="text/javascript">
+
+function loadShader(name, type) {
+	var script = document.getElementById(name);
+	if (!script)
+		return null;
+	
+	var shader = gl.createShader(type);
+	gl.shaderSource(shader, script.textContent);
+	gl.compileShader(shader);
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		alert(gl.getShaderInfoLog(shader));
+		return null;
+	}
+
+	return shader;
+}
+
+function loadProgram(name) {
+	var program = gl.createProgram();
+	gl.attachShader(program, loadShader(name+"-vs", gl.VERTEX_SHADER));
+	gl.attachShader(program, loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+	gl.linkProgram(program);
+
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+		alert(gl.getProgramInfoLog(program));
+		return null;
+	}
+
+	return program;
+}
+
+function loadBuffer(vertices) {
+	var vbo = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+	return vbo;
+}
+
+var canvas;
+var gl;
+
+var program;
+var buffer;
+var count;
+
+var mouse;
+var mouseDown;
+
+var tx = 0.0;
+var ty = 0.0;
+var s = 1.0;
+
+function convertMouse(x, y) {
+	var mx = 2.0 * x / canvas.width - 1.0;
+	var my = 1.0 - 2.0 * y / canvas.height;
+	return [mx, my];
+}
+
+function onMouseDown(event) {
+	mouseDown = true;
+	mouse = convertMouse(event.clientX, event.clientY);
+}
+
+function onMouseUp(event) {
+	mouseDown = false;
+}
+
+function onMouseMove(event) {
+	var aratio = canvas.width / canvas.height;
+
+	var newMouse = convertMouse(event.clientX, event.clientY);
+
+	if (mouseDown) {
+		tx -= (newMouse[0] - mouse[0]) * s * aratio;
+		ty -= (newMouse[1] - mouse[1]) * s;
+	}
+
+	mouse = newMouse;
+
+	if (mouseDown)
+		update();
+}
+
+function onMouseWheel(event) {
+	var aratio = canvas.width / canvas.height;
+
+	var d = Math.pow(0.8, event.wheelDelta / 120);
+
+	tx += mouse[0] * s * (1 / d - 1);
+	ty += mouse[1] * s * (1 / d - 1);
+
+	s *= d;
+
+	update();
+}
+
+function onResize() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	canvas.offsetLeft = 100;
+
+	update();
+}
+
+function initGL() {
+	canvas = document.getElementById("main_canvas");
+	gl = canvas.getContext("experimental-webgl");
+
+	window.addEventListener('resize', onResize, false);
+	onResize();
+
+	program = loadProgram("shader");
+
+	buffer = loadBuffer([-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0]);
+	count = 6;
+
+	canvas.onmousedown = onMouseDown;
+	canvas.onmouseup = onMouseUp;
+	canvas.onmousemove = onMouseMove;
+	canvas.onmousewheel = onMouseWheel;
+
+	//setInterval(() => { step(0.016); }, 16);
+}
+
+function update() {
+	paintGL();
+}
+
+function step(dt) {
+	//update();
+}
+
+function paintGL() {
+	var aratio = canvas.width / canvas.height;
+
+	gl.viewport(0, 0, canvas.width, canvas.height);
+
+	gl.clearColor(0, 0, 0.1, 1);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	gl.useProgram(program);
+
+	gl.uniform2fv(gl.getUniformLocation(program, "center"), [tx, ty]);
+	gl.uniform1f(gl.getUniformLocation(program, "scale"), s);
+	gl.uniform1f(gl.getUniformLocation(program, "ratio"), aratio);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+	var loc = gl.getAttribLocation(program, "vertex")
+	gl.enableVertexAttribArray(loc);
+	gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+	gl.drawArrays(gl.TRIANGLES, 0, count);
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+	gl.useProgram(null);
+}
+
+</script>
+<script id="shader-vs" type="text/glsl">
+precision highp float;
+
+uniform vec2 center;
+uniform float scale;
+uniform float ratio;
+
+attribute vec2 vertex;
+varying vec2 z;
+
+void main(){
+	gl_Position = vec4(vertex, 0.0, 1.0);
+	z = center + vec2(vertex.x * ratio, vertex.y) * scale;
+}
+
+</script>
+<script id="shader-fs" type="text/glsl">
+precision highp float;
+
+varying vec2 z;
+
+void main(){
+	float c;
+	vec2 t = vec2(0.0, 0.0);
+	for (int i = 0; i < 50; ++i) {
+		t = vec2(t.x*t.x - t.y*t.y + z.x, 2.0*t.x*t.y + z.y);
+		if (length(t) > 2.0 || i == 49)
+		{
+			c = float(i) / 50.0;
+			break;
+		}
+	}
+	float color = c;
+	gl_FragColor = vec4(color, color, color, 1.0);
+}
+
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+}
+#main_canvas {
+	width: 100%;
+	height: 100%;
+}
+</style>
+</head>
+<body onload="initGL();paintGL();">
+
+<canvas id="main_canvas" >
+Your browser is a fucking loser.
+</canvas>
+
+</body>
+</html>
