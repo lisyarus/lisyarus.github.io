@@ -155,9 +155,9 @@ function initGL() {
 	rebuildTree();
 
 	canvas.onmousedown = onMouseDown;
-	document.onmouseup = onMouseUp;
-	document.onmousemove = onMouseMove;
-	document.onmousewheel = onMouseWheel;
+	canvas.onmouseup = onMouseUp;
+	canvas.onmousemove = onMouseMove;
+	canvas.onmousewheel = onMouseWheel;
 
 	//setInterval(() => { step(0.016); }, 16);
 }
