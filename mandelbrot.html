@@ -91,10 +91,12 @@ function onMouseWheel(event) {
 
 	var d = Math.pow(0.8, event.wheelDelta / 120);
 
-	tx += mouse[0] * s * (1 / d - 1);
-	ty += mouse[1] * s * (1 / d - 1);
+	var new_s = s * d;
 
-	s *= d;
+	tx += mouse[0] * aratio * (s - new_s);
+	ty += mouse[1] * (s - new_s);
+
+	s = new_s;
 
 	update();
 }
