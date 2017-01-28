@@ -205,11 +205,12 @@ vec4 get_color (float t)
 void main(){
 	float c;
 	vec2 t = vec2(0.0, 0.0);
-	for (int i = 0; i < 50; ++i) {
+	const int m = 50;
+	for (int i = 0; i < m; ++i) {
 		t = vec2(t.x*t.x - t.y*t.y + z.x, 2.0*t.x*t.y + z.y);
-		if (length(t) > 2.0 || i == 49)
+		if (length(t) > 2.0 || i + 1 == m)
 		{
-			c = float(i) / 50.0;
+			c = float(i) / float(m);
 			break;
 		}
 	}
