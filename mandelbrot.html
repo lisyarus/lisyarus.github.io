@@ -55,9 +55,13 @@ var tx = 0.0;
 var ty = 0.0;
 var s = 1.0;
 
+var aratio;
+
+var pixel = 1;
+
 function convertMouse(x, y) {
-	var mx = 2.0 * x / canvas.width - 1.0;
-	var my = 1.0 - 2.0 * y / canvas.height;
+	var mx = 2.0 * x / canvas.clientWidth - 1.0;
+	var my = 1.0 - 2.0 * y / canvas.clientHeight;
 	return [mx, my];
 }
 
@@ -71,8 +75,6 @@ function onMouseUp(event) {
 }
 
 function onMouseMove(event) {
-	var aratio = canvas.width / canvas.height;
-
 	var newMouse = convertMouse(event.clientX, event.clientY);
 
 	if (mouseDown) {
@@ -87,8 +89,6 @@ function onMouseMove(event) {
 }
 
 function onMouseWheel(event) {
-	var aratio = canvas.width / canvas.height;
-
 	var d = Math.pow(0.8, event.wheelDelta / 120);
 
 	var new_s = s * d;
@@ -102,9 +102,9 @@ function onMouseWheel(event) {
 }
 
 function onResize() {
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
-	canvas.offsetLeft = 100;
+	aratio = canvas.clientWidth / canvas.clientHeight;
+	canvas.width = canvas.clientWidth / pixel;
+	canvas.height = canvas.clientHeight / pixel;
 
 	update();
 }
@@ -138,8 +138,6 @@ function step(dt) {
 }
 
 function paintGL() {
-	var aratio = canvas.width / canvas.height;
-
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
 	gl.clearColor(0, 0, 0.1, 1);
