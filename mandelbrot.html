@@ -181,6 +181,27 @@ precision highp float;
 
 varying vec2 z;
 
+vec4 get_color (float t)
+{
+	const vec4 black = vec4(0.0, 0.0, 0.0, 1.0);
+	const vec4 red = vec4(1.0, 0.0, 0.0, 1.0);
+	const vec4 yellow = vec4(1.0, 1.0, 0.0, 1.0);
+	const vec4 white = vec4(1.0, 1.0, 1.0, 1.0);
+
+	if (t < 1.0/3.0)
+	{
+		return mix(black, red, t*3.0);
+	}
+	else if (t < 2.0/3.0)
+	{
+		return mix(red, yellow, t*3.0-1.0);
+	}
+	else
+	{
+		return mix(yellow, white, t*3.0-2.0);
+	}
+}
+
 void main(){
 	float c;
 	vec2 t = vec2(0.0, 0.0);
@@ -192,8 +213,7 @@ void main(){
 			break;
 		}
 	}
-	float color = c;
-	gl_FragColor = vec4(color, color, color, 1.0);
+	gl_FragColor = get_color(c);
 }
 
 </script>
