@@ -1,0 +1,482 @@
+<html>
+<head>
+<script id="waves-render-vs" type="text/glsl">
+precision mediump float;
+
+attribute vec2 vertex;
+
+varying vec2 texCoord;
+
+void main(){
+	gl_Position = vec4(vertex, 0.0, 1.0);
+	texCoord = (vec2(1.0, 1.0) + vertex) / 2.0;
+}
+
+</script>
+<script id="waves-render-fs" type="text/glsl">
+precision mediump float;
+
+uniform sampler2D tex;
+uniform sampler2D env;
+
+varying vec2 texCoord;
+
+void main(){
+	float v = texture2D(tex, texCoord).r;
+	float c = texture2D(env, texCoord).r/10.0;
+	float blue = 1.0 / (1.0 + exp(-v));
+	float white = 1.0 / (1.0 + exp(-v/10.0));
+	vec4 color = vec4(0.0);
+	if (v > 0.0) {
+		color = mix(vec4(0.0, 0.0, 1.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), 2.0 * white - 1.0);
+	} else {
+		color = mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 1.0), 2.0 * white);
+	}
+	color = mix(vec4(1.0, 0.0, 0.0, 1.0), color, c);
+	gl_FragColor = color;
+}
+
+</script>
+<script id="waves-solve-vs" type="text/glsl">
+precision mediump float;
+
+attribute vec2 vertex;
+
+varying vec2 texCoord;
+
+void main(){
+	gl_Position = vec4(vertex, 0.0, 1.0);
+	texCoord = (vec2(1.0, 1.0) + vertex) / 2.0;
+}
+
+</script>
+<script id="waves-solve-fs" type="text/glsl">
+#extension GL_EXT_draw_buffers : require
+precision mediump float;
+
+uniform sampler2D f;
+uniform sampler2D env;
+uniform int mouse_down;
+uniform vec2 mouse;
+uniform int mode;
+uniform float param1;
+uniform float param2;
+uniform float du;
+uniform float dx;
+uniform float dt;
+
+varying vec2 texCoord;
+
+void main(){
+	vec2 tc = texCoord;
+	float v = texture2D(f, tc).r;
+	float vt = texture2D(f, tc).g;
+
+	float c = texture2D(env, tc).r;
+	float bx = texture2D(env, tc).g;
+	float by = texture2D(env, tc).b;
+
+	if (bx > 1.0) {
+		float vx0 = texture2D(f, tc + vec2(-du, 0)).r;
+		vt = - c * (v - vx0) / dx;
+		v = v + vt * dt;
+	} else if (bx < -1.0) {
+		float vx1 = texture2D(f, tc + vec2(du, 0)).r;
+		vt = c * (vx1 - v) / dx;
+		v = v + vt * dt;
+	} else if (by > 1.0) {
+		float vy0 = texture2D(f, tc + vec2(0, -du)).r;
+		vt = - c * (v - vy0) / dx;
+		v = v + vt * dt;
+	} else if (by < -1.0) {
+		float vy1 = texture2D(f, tc + vec2(0, du)).r;
+		vt = c * (vy1 - v) / dx;
+		v = v + vt * dt;
+	} else {
+		float vx0 = texture2D(f, tc + vec2(-du, 0)).r;
+		float vx1 = texture2D(f, tc + vec2( du, 0)).r;
+		float vy0 = texture2D(f, tc + vec2( 0, -du)).r;
+		float vy1 = texture2D(f, tc + vec2( 0,  du)).r;
+
+		float lp = (vx0 + vx1 + vy0 + vy1 - 4.0 * v) / dx / dx;
+
+		vt = vt + c * c * lp * dt;
+		v = v + vt * dt;
+	}
+
+	if (mouse_down == 1) {
+		if (mode == 0) {
+			vec2 d = texCoord-mouse;
+			float l = length(d);
+
+			if (c != 0.0) {
+				v += 100.0 * exp(-10000.0*pow(l,2.0));
+			}
+
+			//v += 100.0 * exp(-1000.0 * pow(l,2.0))*sin(d.x*600.0);
+			//vt += - c * 0.0 * (-1000.0 * 2.0 * d.x * exp(-1000.0*pow(l,2.0))*sin(d.x*600.0) + exp(-1000.0*pow(l,2.0))*600.0*cos(d.x*600.0));
+
+			//v = 100.0 * exp(-1000.0 * d.x * d.x);
+			//vt = c * 400.0 * 2.0 * d.x * exp(-1000.0 * d.x * d.x);
+		}
+
+		if (mode == 1) {
+			vec2 d = texCoord-mouse;
+			float l = length(d)*512.0;
+
+			if (l < param2) {
+				c = param1;
+				v = 0.0;
+				vt = 0.0;
+			}
+		}
+
+	}
+
+	gl_FragData[0] = vec4(v, vt, 0.0, 0.0);
+	gl_FragData[1] = vec4(c, bx, by, 0.0);
+}
+
+</script>
+<script type="text/javascript">
+'use strict';
+
+class Frame {
+	constructor (canvas, pixelSize = 1) {
+		this.canvas = canvas;
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.mouseDown = false;
+		this.mouse = [0, 0];
+		try {
+			this.gl = canvas.getContext("experimental-webgl");
+		} catch (e) {
+			alert('Failed to load WebGL:', e);
+		}
+		this.extensions = new Map();
+		this.pixelSize = pixelSize;
+		this.onResize();
+	}
+
+	loadExt (name) {
+		var ext;
+		try {
+			ext = this.gl.getExtension(name);
+		} catch (e) {
+			alert('Failed to load WebGL extension', name, ':', e);
+		}
+		this.extensions[name] = ext;
+		return ext;
+	}
+
+	onResize () {
+		this.canvas.width  = this.canvas.clientWidth / this.pixelSize;
+		this.canvas.height = this.canvas.clientHeight / this.pixelSize;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown (event) {
+		this.mouseDown = true;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseUp (event) {
+		this.mouseDown = false;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseMove (event) {
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	draw () {
+		var gl = this.gl;
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+}
+
+class WavesFrame extends Frame {
+	constructor (canvas) {
+		super(canvas, 1);
+
+		this.textureSize = canvas.clientWidth;
+
+		this.mouseAction = 0;
+
+		var gl = this.gl;
+
+		this.loadExt("OES_texture_float");
+		this.drawBuffersExt = this.loadExt("WEBGL_draw_buffers");
+
+		var initialPixels = new Float32Array(this.textureSize * this.textureSize * 4);
+		for (var x = 0; x < this.textureSize; ++x) {
+			for (var y = 0; y < this.textureSize; ++y) {
+				var offset = (x + y * this.textureSize) * 4;
+				{
+					initialPixels[offset + 0] = (Math.random() * 2.0 - 1.0) * 1000.0;0 * Math.exp(-(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2))/10000.0);
+					initialPixels[offset + 1] = (Math.random() * 2.0 - 1.0) * 1000.0;
+					initialPixels[offset + 2] = 0;
+					initialPixels[offset + 3] = 0;
+				}
+			}
+		}
+
+		this.frontTexture = this.createTexture(this.textureSize, this.textureSize, initialPixels);
+		this.backTexture = this.createTexture(this.textureSize, this.textureSize);
+
+		var envPixels = new Float32Array(this.textureSize * this.textureSize * 4);
+		for (var x = 0; x < this.textureSize; ++x) {
+			for (var y = 0; y < this.textureSize; ++y) {
+				var offset = (x + y * this.textureSize) * 4;
+				{
+					var edge = (x == 0) || (x == this.textureSize-1) || (y == 0) || (y == this.textureSize-1);
+					var distanceFromCenter = Math.pow(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2), 0.5);
+					envPixels[offset + 0] = 10.0;(distanceFromCenter>250) ? 0.0 : 10.0;
+					envPixels[offset + 1] = (x < 1) ? -10.0 : (x + 1 >= this.textureSize) ? 10.0 : 0.0;
+					envPixels[offset + 2] = (y < 1) ? -10.0 : (y + 1 >= this.textureSize) ? 10.0 : 0.0;
+					envPixels[offset + 3] = 0;
+				}
+			}
+		}
+		this.envTexture = this.createTexture(this.textureSize, this.textureSize, envPixels);
+		this.envBackTexture = this.createTexture(this.textureSize, this.textureSize);
+
+		this.buffer = this.createBuffer([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
+		this.solveProgram = this.loadProgram('waves-solve');
+		this.renderProgram = this.loadProgram('waves-render');
+
+		this.framebuffer = gl.createFramebuffer();
+	}
+
+	setMouseAction (action = 'well') {
+		this.mouseAction = action;
+	}
+
+	createTexture (width, height, pixels = null) {
+		var gl = this.gl;
+
+		var texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, pixels);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		return texture;
+	}
+
+	createBuffer (vertices) {
+		var gl = this.gl;
+
+		var buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		return buffer;
+	}
+
+	loadShader(name, type) {
+		var gl = this.gl;
+
+		var script = document.getElementById(name);
+		if (!script)
+			return null;
+		
+		var shader = gl.createShader(type);
+		gl.shaderSource(shader, script.textContent);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			alert(name + ": " + gl.getShaderInfoLog(shader));
+			return null;
+		}
+
+		return shader;
+	}
+
+	loadProgram(name) {
+		var gl = this.gl;
+
+		var program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			alert(gl.getProgramInfoLog(program));
+			return null;
+		}
+
+		return program;
+	}
+
+	draw () {
+		var gl = this.gl;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		gl.clearColor(0, 0, 0, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+		gl.useProgram(this.renderProgram);
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, this.frontTexture);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, this.envTexture);
+		gl.uniform1i(gl.getUniformLocation(this.renderProgram, "tex"), 0);
+		gl.uniform1i(gl.getUniformLocation(this.renderProgram, "env"), 1);
+		var location = gl.getAttribLocation(this.renderProgram, "vertex")
+		gl.enableVertexAttribArray(location);
+		gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		gl.useProgram(null);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+	}
+
+	step (dt) {
+		var gl = this.gl;
+		var db = this.drawBuffersExt;
+
+		this.gl.viewport(0, 0, this.textureSize, this.textureSize);
+
+		var temp = this.backTexture;
+		this.backTexture = this.frontTexture;
+		this.frontTexture = temp;
+
+		var temp = this.envBackTexture;
+		this.envBackTexture = this.envTexture;
+		this.envTexture = temp;
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+		gl.useProgram(this.solveProgram);
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, db.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.frontTexture, 0);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, db.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.envTexture, 0);
+		db.drawBuffersWEBGL([db.COLOR_ATTACHMENT0_WEBGL, db.COLOR_ATTACHMENT1_WEBGL]);
+
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, this.backTexture);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, this.envBackTexture);
+
+		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "f"), 0);
+		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "env"), 1);
+		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "mouse_down"), this.mouseDown ? 1 : 0);
+		gl.uniform2f(gl.getUniformLocation(this.solveProgram, "mouse"), this.mouse[0] / this.textureSize, 1.0 - this.mouse[1] / this.textureSize);
+		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "mode"), this.mouseAction);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param1"), document.getElementById('obstacle-speed').value);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param2"), document.getElementById('brush-size').value);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "du"), 1.0 / this.textureSize);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "dx"), 256.0 / this.textureSize);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "dt"), dt);
+		var location = gl.getAttribLocation(this.solveProgram, "vertex")
+		gl.enableVertexAttribArray(location);
+		gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.useProgram(null);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+	}
+}
+
+function init () {
+	var canvas = document.getElementById("main-canvas");
+	var frame = new WavesFrame(canvas);
+
+	window.addEventListener('resize', () => { frame.onResize(); frame.draw(); });
+
+	var mouseActionSelect = document.getElementById('mouse-action');
+	mouseActionSelect.oninput = () => {
+		var action = mouseActionSelect.value;
+		frame.setMouseAction(action);
+		document.getElementById('control-table').style.visibility = (action == 0) ? 'hidden' : 'visible';
+	};
+
+	frame.draw();
+
+	var dt = 20;
+
+	setInterval(() => { frame.step(dt * 0.001); frame.draw(); }, dt);
+}
+
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+}
+#main-canvas {
+	position: absolute;
+	left: 0%;
+	top: 0%;
+	width: 512;
+	height: 512;
+}
+#mouse-action-text {
+	position: absolute;
+	left: 550;
+	top: 30;
+}
+#mouse-action {
+	position: absolute;
+	left: 650;
+	top: 30;
+}
+#control-table {
+	position: absolute;
+	left: 550;
+	top: 60;
+}
+</style>
+</head>
+<body onload="init();">
+
+<canvas id='main-canvas' >
+Your browser is a fucking loser.
+</canvas>
+
+<div id='mouse-action-text'>Mouse action:</div>
+<select id='mouse-action'>
+<option value=0>Wave</option>
+<option value=1>Medium</option>
+</select>
+
+<table id='control-table' style='visibility:hidden'>
+<tr>
+<td width='200px'>
+<div id='obstacle-speed-text'>Wave speed: 0.0</div>
+</td>
+<td>
+<input type='range' id='obstacle-speed' min='0.0' max='10.0' step='1.0' value='0.0' oninput='document.getElementById("obstacle-speed-text").textContent="Wave speed: " + this.value;'></input>
+</td>
+</tr>
+<tr>
+<td>
+<div id='brush-size-text'>Brush size: 25</div>
+</td>
+<td>
+<input type='range' id='brush-size' min='0.0' max='100.0' step='1.0' value='25.0' oninput='document.getElementById("brush-size-text").textContent="Brush size: " + this.value;'></input>
+</td>
+</tr>
+</table>
+
+
+</body>
+</html>
