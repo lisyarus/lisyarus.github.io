@@ -217,8 +217,8 @@ class WavesFrame extends Frame {
 			for (var y = 0; y < this.textureSize; ++y) {
 				var offset = (x + y * this.textureSize) * 4;
 				{
-					initialPixels[offset + 0] = (Math.random() * 2.0 - 1.0) * 1000.0;0 * Math.exp(-(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2))/10000.0);
-					initialPixels[offset + 1] = (Math.random() * 2.0 - 1.0) * 1000.0;
+					initialPixels[offset + 0] = 0;(Math.random() * 2.0 - 1.0) * 1000.0;0 * Math.exp(-(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2))/10000.0);
+					initialPixels[offset + 1] = 0;(Math.random() * 2.0 - 1.0) * 1000.0;
 					initialPixels[offset + 2] = 0;
 					initialPixels[offset + 3] = 0;
 				}
