@@ -212,37 +212,10 @@ class WavesFrame extends Frame {
 		this.loadExt("OES_texture_float");
 		this.drawBuffersExt = this.loadExt("WEBGL_draw_buffers");
 
-		var initialPixels = new Float32Array(this.textureSize * this.textureSize * 4);
-		for (var x = 0; x < this.textureSize; ++x) {
-			for (var y = 0; y < this.textureSize; ++y) {
-				var offset = (x + y * this.textureSize) * 4;
-				{
-					initialPixels[offset + 0] = 0;(Math.random() * 2.0 - 1.0) * 1000.0;0 * Math.exp(-(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2))/10000.0);
-					initialPixels[offset + 1] = 0;(Math.random() * 2.0 - 1.0) * 1000.0;
-					initialPixels[offset + 2] = 0;
-					initialPixels[offset + 3] = 0;
-				}
-			}
-		}
-
-		this.frontTexture = this.createTexture(this.textureSize, this.textureSize, initialPixels);
+		this.frontTexture = this.createTexture(this.textureSize, this.textureSize);
 		this.backTexture = this.createTexture(this.textureSize, this.textureSize);
 
-		var envPixels = new Float32Array(this.textureSize * this.textureSize * 4);
-		for (var x = 0; x < this.textureSize; ++x) {
-			for (var y = 0; y < this.textureSize; ++y) {
-				var offset = (x + y * this.textureSize) * 4;
-				{
-					var edge = (x == 0) || (x == this.textureSize-1) || (y == 0) || (y == this.textureSize-1);
-					var distanceFromCenter = Math.pow(Math.pow(x-this.textureSize/2,2)+Math.pow(y-this.textureSize/2,2), 0.5);
-					envPixels[offset + 0] = 10.0;(distanceFromCenter>250) ? 0.0 : 10.0;
-					envPixels[offset + 1] = (x < 1) ? -10.0 : (x + 1 >= this.textureSize) ? 10.0 : 0.0;
-					envPixels[offset + 2] = (y < 1) ? -10.0 : (y + 1 >= this.textureSize) ? 10.0 : 0.0;
-					envPixels[offset + 3] = 0;
-				}
-			}
-		}
-		this.envTexture = this.createTexture(this.textureSize, this.textureSize, envPixels);
+		this.envTexture = this.createTexture(this.textureSize, this.textureSize);
 		this.envBackTexture = this.createTexture(this.textureSize, this.textureSize);
 
 		this.buffer = this.createBuffer([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
@@ -250,13 +223,91 @@ class WavesFrame extends Frame {
 		this.renderProgram = this.loadProgram('waves-render');
 
 		this.framebuffer = gl.createFramebuffer();
+
+		this.presets = new Map();
+
+		this.presets['empty'] = () => {
+			return [this.emptyArray(), this.emptyArray(), this.emptyArray(10.0)];
+		};
+
+		this.presets['standing'] = () => {
+			var size = 100;
+			var depth = 25;
+
+			var wave = this.emptyArray();
+			var dwave = this.emptyArray();
+
+			for (var x = 0; x < this.textureSize; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					var ox = (x-this.textureSize/2);
+					var oy = (y-this.textureSize/2);
+
+					if (Math.abs(ox) < size && Math.abs(oy) < size) {
+						wave[offset] = 100.0*Math.sin(ox/size*Math.PI*4)*Math.sin(oy/size*Math.PI*4);
+					}
+				}
+			}
+
+			var env = this.emptyArray(10.0);
+			for (var x = 0; x < this.textureSize; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					var ox = Math.abs(x-this.textureSize/2);
+					var oy = Math.abs(y-this.textureSize/2);
+
+					if ((ox >= size && ox < size+depth && oy < size+depth) || (oy >= size && oy < size+depth && ox < size+depth)) {
+						env[offset] = 0.0;
+					}
+				}
+			}
+
+			return [wave, dwave, env];
+		};
+
+		this.presets['double-slit'] = () => {
+			var wave = this.emptyArray();
+			var dwave = this.emptyArray();
+
+			for (var x = 0; x < this.textureSize/4; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					wave[offset] = 100.0*Math.sin(x)*Math.exp(-Math.pow(y-this.textureSize/2,2)*0.0001);
+				}
+			}
+
+			var env = this.emptyArray(10.0);
+			for (var x = -5; x < 5; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + this.textureSize/2 + y * this.textureSize);
+					if (Math.abs(Math.abs(y - this.textureSize/2)-20)>5) {
+						env[offset] = 0.0;
+					}
+				}
+			}
+
+			return [wave, dwave, env];
+		};
+
+		this.loadPreset('empty');
+	}
+
+	emptyArray (value = 0.0) {
+		var a = new Float32Array(this.textureSize * this.textureSize);
+		for (var x = 0; x < this.textureSize; ++x) {
+			for (var y = 0; y < this.textureSize; ++y) {
+				var offset = (x + y * this.textureSize);
+				a[offset] = value;
+			}
+		}
+		return a;
 	}
 
 	setMouseAction (action = 'well') {
 		this.mouseAction = action;
 	}
 
-	createTexture (width, height, pixels = null) {
+	createTexture (width, height) {
 		var gl = this.gl;
 
 		var texture = gl.createTexture();
@@ -265,7 +316,7 @@ class WavesFrame extends Frame {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, pixels);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		return texture;
 	}
@@ -394,11 +445,48 @@ class WavesFrame extends Frame {
 		gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
 	}
+
+	loadPreset (name) {
+		var preset = this.presets[name]();
+
+		var wave = preset[0];
+		var dwave = preset[1];
+		var env = preset[2];
+
+		var wavePixels = new Float32Array(this.textureSize * this.textureSize * 4);
+		for (var x = 0; x < this.textureSize; ++x) {
+			for (var y = 0; y < this.textureSize; ++y) {
+				var offset = x + y * this.textureSize;
+				wavePixels[offset*4 + 0] = wave[offset];
+				wavePixels[offset*4 + 1] = dwave[offset];
+			}
+		}
+
+		var envPixels = new Float32Array(this.textureSize * this.textureSize * 4);
+		for (var x = 0; x < this.textureSize; ++x) {
+			for (var y = 0; y < this.textureSize; ++y) {
+				var offset = x + y * this.textureSize;
+				envPixels[offset*4 + 0] = env[offset];
+				envPixels[offset*4 + 1] = (x < 1) ? -10.0 : (x + 1 >= this.textureSize) ? 10.0 : 0.0;
+				envPixels[offset*4 + 2] = (y < 1) ? -10.0 : (y + 1 >= this.textureSize) ? 10.0 : 0.0;
+			}
+		}
+
+		var gl = this.gl;
+
+		gl.bindTexture(gl.TEXTURE_2D, this.frontTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.textureSize, this.textureSize, 0, gl.RGBA, gl.FLOAT, wavePixels);
+		gl.bindTexture(gl.TEXTURE_2D, this.envTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.textureSize, this.textureSize, 0, gl.RGBA, gl.FLOAT, envPixels);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
 }
+
+var frame;
 
 function init () {
 	var canvas = document.getElementById("main-canvas");
-	var frame = new WavesFrame(canvas);
+	frame = new WavesFrame(canvas);
 
 	window.addEventListener('resize', () => { frame.onResize(); frame.draw(); });
 
@@ -444,6 +532,11 @@ function init () {
 	left: 550;
 	top: 60;
 }
+#preset-control {
+	position: absolute;
+	left: 550;
+	top: 200;
+}
 </style>
 </head>
 <body onload="init();">
@@ -477,6 +570,19 @@ Your browser is a fucking loser.
 </tr>
 </table>
 
+<table id='preset-control'>
+<tr>
+<td>Load preset:</td>
+<td>
+<select id='preset'>
+<option value='empty'>Empty</option>
+<option value='standing'>Standing wave</option>
+<option value='double-slit'>Double-slit difraction</option>
+</select>
+</td>
+<td><input type='button' value='Load' onclick="frame.loadPreset(document.getElementById('preset').value);" /></td>
+</tr>
+</table>
 
 </body>
 </html>
