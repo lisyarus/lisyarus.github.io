@@ -272,7 +272,7 @@ class WavesFrame extends Frame {
 			for (var x = 0; x < this.textureSize/4; ++x) {
 				for (var y = 0; y < this.textureSize; ++y) {
 					var offset = (x + y * this.textureSize);
-					wave[offset] = 100.0*Math.sin(x)*Math.exp(-Math.pow(y-this.textureSize/2,2)*0.0001);
+					wave[offset] = 100.0*Math.sin(x);
 				}
 			}
 
