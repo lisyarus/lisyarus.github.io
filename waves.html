@@ -52,7 +52,7 @@ void main(){
 </script>
 <script id="waves-solve-fs" type="text/glsl">
 #extension GL_EXT_draw_buffers : require
-precision mediump float;
+precision highp float;
 
 uniform sampler2D f;
 uniform sampler2D env;
@@ -110,7 +110,17 @@ void main(){
 			float l = length(d);
 
 			if (c != 0.0) {
-				v += 100.0 * exp(-10000.0*pow(l,2.0));
+				//v += 100.0 * sin(l*250.0) * exp(-0.001*pow(l*512.0,2.0));
+				l = l * 512.0 / param1;
+				if (l < param2) {
+					float s = 0.0;
+					float c = 1.0;
+					for (int k = 1; k < 40; ++k) {
+						s += c;
+						c = - c / float(k * k) * (l * l) / 4.0;
+					}
+					v += s * 1000.0;
+				}
 			}
 
 			//v += 100.0 * exp(-1000.0 * pow(l,2.0))*sin(d.x*600.0);
@@ -451,8 +461,21 @@ class WavesFrame extends Frame {
 		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "mouse_down"), this.mouseDown ? 1 : 0);
 		gl.uniform2f(gl.getUniformLocation(this.solveProgram, "mouse"), this.mouse[0] / this.textureSize, 1.0 - this.mouse[1] / this.textureSize);
 		gl.uniform1i(gl.getUniformLocation(this.solveProgram, "mode"), this.mouseAction);
-		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param1"), document.getElementById('obstacle-speed').value);
-		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param2"), document.getElementById('brush-size').value);
+		var param1;
+		var param2;
+		if (this.mouseAction == 0) {
+			param1 = document.getElementById('wave-length').value;
+			param2 = document.getElementById('wave-size').value;
+
+			var zeros = [0.0, 2.4048, 5.5201, 8.6537, 11.7915, 14.9309, 18.0710];
+
+			param2 = zeros[param2];
+		} else if (this.mouseAction == 1) {
+			param1 = document.getElementById('obstacle-speed').value;
+			param2 = document.getElementById('brush-size').value;
+		}
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param1"), param1);
+		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "param2"), param2);
 		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "du"), 1.0 / this.textureSize);
 		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "dx"), 256.0 / this.textureSize);
 		gl.uniform1f(gl.getUniformLocation(this.solveProgram, "dt"), dt);
@@ -521,6 +544,7 @@ function init () {
 		var action = mouseActionSelect.value;
 		frame.setMouseAction(action);
 		document.getElementById('control-table').style.visibility = (action == 0) ? 'hidden' : 'visible';
+		document.getElementById('wave-table').style.visibility = (action == 1) ? 'hidden' : 'visible';
 	};
 
 	frame.draw();
@@ -558,6 +582,11 @@ function init () {
 	left: 550;
 	top: 60;
 }
+#wave-table {
+	position: absolute;
+	left: 550;
+	top: 60;
+}
 #preset-control {
 	position: absolute;
 	left: 550;
@@ -573,9 +602,28 @@ Your browser is a fucking loser.
 
 <div id='mouse-action-text'>Mouse action:</div>
 <select id='mouse-action'>
-<option value=0>Wave</option>
+<option value=0>Radial wave</option>
 <option value=1>Medium</option>
 </select>
+
+<table id='wave-table'>
+<tr>
+<td width='200px'>
+<div id='wave-length-text'>Wave length: 1.0</div>
+</td>
+<td>
+<input type='range' id='wave-length' min='1.0' max='10.0' step='0.1' value='1.0' oninput='document.getElementById("wave-length-text").textContent="Wave length: " + this.value;'></input>
+</td>
+</tr>
+<tr>
+<td>
+<div id='wave-size-text'>Wave size: 6</div>
+</td>
+<td>
+<input type='range' id='wave-size' min='1.0' max='6.0' step='1.0' value='6.0' oninput='document.getElementById("wave-size-text").textContent="Wave size: " + this.value;'></input>
+</td>
+</tr>
+</table>
 
 <table id='control-table' style='visibility:hidden'>
 <tr>
