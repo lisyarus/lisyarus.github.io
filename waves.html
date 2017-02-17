@@ -289,6 +289,32 @@ class WavesFrame extends Frame {
 			return [wave, dwave, env];
 		};
 
+		this.presets['refraction'] = () => {
+			var wave = this.emptyArray();
+			var dwave = this.emptyArray();
+
+			for (var x = 0; x < this.textureSize/4; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					wave[offset] = 100.0*Math.sin(x/5.0);
+				}
+			}
+
+			var env = this.emptyArray(10.0);
+			for (var x = 0; x < this.textureSize; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					var oy = y;
+					var ox = x - this.textureSize/2;
+					if (Math.abs(16.0*ox) < oy) {
+						env[offset] = 5.0;
+					}
+				}
+			}
+
+			return [wave, dwave, env];
+		};
+
 		this.loadPreset('empty');
 	}
 
@@ -578,6 +604,7 @@ Your browser is a fucking loser.
 <option value='empty'>Empty</option>
 <option value='standing'>Standing wave</option>
 <option value='double-slit'>Double-slit difraction</option>
+<option value='refraction'>Refraction</option>
 </select>
 </td>
 <td><input type='button' value='Load' onclick="frame.loadPreset(document.getElementById('preset').value);" /></td>
