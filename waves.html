@@ -228,6 +228,8 @@ class WavesFrame extends Frame {
 		this.envTexture = this.createTexture(this.textureSize, this.textureSize);
 		this.envBackTexture = this.createTexture(this.textureSize, this.textureSize);
 
+		this.clear();
+
 		this.buffer = this.createBuffer([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
 		this.solveProgram = this.loadProgram('waves-solve');
 		this.renderProgram = this.loadProgram('waves-render');
@@ -235,10 +237,6 @@ class WavesFrame extends Frame {
 		this.framebuffer = gl.createFramebuffer();
 
 		this.presets = new Map();
-
-		this.presets['empty'] = () => {
-			return [this.emptyArray(), this.emptyArray(), this.emptyArray(10.0)];
-		};
 
 		this.presets['standing'] = () => {
 			var size = 100;
@@ -324,8 +322,6 @@ class WavesFrame extends Frame {
 
 			return [wave, dwave, env];
 		};
-
-		this.loadPreset('empty');
 	}
 
 	emptyArray (value = 0.0) {
@@ -502,6 +498,11 @@ class WavesFrame extends Frame {
 		var dwave = preset[1];
 		var env = preset[2];
 
+		this.loadWave(wave, dwave);
+		this.loadEnv(env);
+	}
+
+	loadWave (wave, dwave) {
 		var wavePixels = new Float32Array(this.textureSize * this.textureSize * 4);
 		for (var x = 0; x < this.textureSize; ++x) {
 			for (var y = 0; y < this.textureSize; ++y) {
@@ -511,6 +512,14 @@ class WavesFrame extends Frame {
 			}
 		}
 
+		var gl = this.gl;
+
+		gl.bindTexture(gl.TEXTURE_2D, this.frontTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.textureSize, this.textureSize, 0, gl.RGBA, gl.FLOAT, wavePixels);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+
+	loadEnv (env) {
 		var envPixels = new Float32Array(this.textureSize * this.textureSize * 4);
 		for (var x = 0; x < this.textureSize; ++x) {
 			for (var y = 0; y < this.textureSize; ++y) {
@@ -523,11 +532,22 @@ class WavesFrame extends Frame {
 
 		var gl = this.gl;
 
-		gl.bindTexture(gl.TEXTURE_2D, this.frontTexture);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.textureSize, this.textureSize, 0, gl.RGBA, gl.FLOAT, wavePixels);
 		gl.bindTexture(gl.TEXTURE_2D, this.envTexture);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.textureSize, this.textureSize, 0, gl.RGBA, gl.FLOAT, envPixels);
 		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+
+	clearWave () {
+		this.loadWave(this.emptyArray(), this.emptyArray());
+	}
+
+	clearEnv () {
+		this.loadEnv(this.emptyArray(10.0));
+	}
+
+	clear () {
+		this.clearWave();
+		this.clearEnv();
 	}
 }
 
@@ -590,7 +610,25 @@ function init () {
 #preset-control {
 	position: absolute;
 	left: 550;
-	top: 200;
+	top: 150;
+}
+#clear{
+	position: absolute;
+	left: 550;
+	top: 230;
+	width: 100;
+}
+#clear-wave {
+	position: absolute;
+	left: 550;
+	top: 260;
+	width: 100;
+}
+#clear-env {
+	position: absolute;
+	left: 550;
+	top: 290;
+	width: 100;
 }
 </style>
 </head>
@@ -649,15 +687,18 @@ Your browser is a fucking loser.
 <td>Load preset:</td>
 <td>
 <select id='preset'>
-<option value='empty'>Empty</option>
 <option value='standing'>Standing wave</option>
 <option value='double-slit'>Double-slit difraction</option>
 <option value='refraction'>Refraction</option>
 </select>
 </td>
-<td><input type='button' value='Load' onclick="frame.loadPreset(document.getElementById('preset').value);" /></td>
+<td><input type='button' value='Load' onclick="frame.loadPreset(document.getElementById('preset').value);" style='width:100' /></td>
 </tr>
 </table>
+
+<input type='button' id='clear' value="Clear" onclick="frame.clear();" />
+<input type='button' id='clear-wave' value="Clear waves" onclick="frame.clearWave();" />
+<input type='button' id='clear-env' value="Clear medium" onclick="frame.clearEnv();" />
 
 </body>
 </html>
