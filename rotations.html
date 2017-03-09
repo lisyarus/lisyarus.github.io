@@ -1,0 +1,610 @@
+<html>
+<head>
+<script id="render-vs" type="text/glsl">
+precision mediump float;
+
+uniform mat4 modelview;
+uniform mat4 projection;
+
+attribute vec3 vertex_in;
+attribute vec3 color_in;
+
+varying vec3 color;
+
+void main(){
+	color = color_in;
+	gl_Position = projection * modelview * vec4(vertex_in, 1.0);
+}
+
+</script>
+<script id="render-fs" type="text/glsl">
+precision mediump float;
+
+varying vec3 color;
+
+void main(){
+	gl_FragColor = vec4(color, 1.0);
+}
+
+</script>
+<script type="text/javascript">
+'use strict';
+
+function assert (condition, message = "Assertion failed") {
+	if (!condition) {
+		throw new Error(message);
+	}
+	return condition;
+}
+
+class Vec {
+
+	static _checkLength (v1, v2) {
+		assert(v1.length == v2.length, "Vectors should have the same length");
+	}
+
+	static zero (length) {
+		let r = new Array(length);
+		for (let i = 0; i < length; ++i) {
+			r[i] = 0;
+		}
+		return r;
+	}
+	
+	static add (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] + v2[i];
+		}
+		return v;
+	}
+
+	static sub (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] - v2[i];
+		}
+		return v;
+	}
+
+}
+
+class Mat {
+
+	static empty (rows, columns) {
+		let m = new Array(rows);
+		for (let i = 0; i < rows; ++i) {
+			m[i] = new Array(columns);
+		}
+		return m;
+	}
+
+	static zero (rows, columns) {
+		let m = Mat.empty(rows, columns);
+		for (let i = 0; i < rows; ++i) {	
+			for (let j = 0; j < columns; ++j) {
+				m[i][j] = 0;
+			}
+		}
+		return m;
+	}
+
+	static scalar (size, value) {
+		let m = Mat.zero(size, size);
+		for (let i = 0; i < size; ++i) {
+			m[i][i] = value;
+		}
+		return m;
+	}
+
+	static identity (size) {
+		return Mat.scalar(size, 1);
+	}
+
+	static ortho (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = 1 / right;
+		m[1][1] = 1 / top;
+		m[2][2] = - 2 / (far - near);
+		m[2][3] = - (far + near) / (far - near);
+		m[3][3] = 1;
+		return m;
+	}
+
+	static frustum (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = near / right;
+		m[1][1] = near / top;
+		m[2][2] = - (far + near) / (far - near);
+		m[2][3] = - 2 * far * near / (far - near);
+		m[3][2] = -1;
+		return m;
+	}
+
+	static add (m1, m2) {
+		assert(m1.length == m2.length && m1[0].length == m2[0].length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+
+		let r = Mat.empty(size1, size2);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				r[i][j] = m1[i][j] + m2[i][j];
+			}
+		}
+
+		return r;
+	}
+
+	static mult (m1, m2) {
+		assert(m1[0].length == m2.length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+		let size3 = m2[0].length;
+
+		let r = Mat.zero(size1, size3);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				for (let k = 0; k < size3; ++k) {
+					r[i][k] += m1[i][j] * m2[j][k];
+				}
+			}
+		}
+
+		return r;
+	}
+
+	static rotationXY (a) {
+		let r = Mat.identity(4);
+		r[0][0] = Math.cos(a);
+		r[0][1] = -Math.sin(a);
+		r[1][0] = Math.sin(a);
+		r[1][1] = Math.cos(a);
+		return r;
+	}
+
+	static rotationYZ (a) {
+		let r = Mat.identity(4);
+		r[1][1] = Math.cos(a);
+		r[1][2] = -Math.sin(a);
+		r[2][1] = Math.sin(a);
+		r[2][2] = Math.cos(a);
+		return r;
+	}
+
+	static rotationZX (a) {
+		let r = Mat.identity(4);
+		r[2][2] = Math.cos(a);
+		r[2][0] = -Math.sin(a);
+		r[0][2] = Math.sin(a);
+		r[0][0] = Math.cos(a);
+		return r;
+	}
+
+	static rotationGeneratorXY () {
+		let r = Mat.zero(4, 4);
+		r[0][0] = 0;
+		r[0][1] = -1;
+		r[1][0] = 1;
+		r[1][1] = 0;
+		return r;
+	}
+
+	static rotationGeneratorYZ () {
+		let r = Mat.zero(4, 4);
+		r[1][1] = 0;
+		r[1][2] = -1;
+		r[2][1] = 1;
+		r[2][2] = 0;
+		return r;
+	}
+
+	static rotationGeneratorZX (a) {
+		let r = Mat.zero(4, 4);
+		r[2][2] = 0;
+		r[2][0] = -1;
+		r[0][2] = 1;
+		r[0][0] = 0;
+		return r;
+	}
+
+	static translation (v) {
+		let r = Mat.identity(4);
+		r[0][3] = v[0];
+		r[1][3] = v[1];
+		r[2][3] = v[2];
+		return r;
+	}
+
+	static exp (m) {
+		let r = Mat.identity(m.length);
+		let mm = m;
+		for (let i = 1; i < 10; ++i) {
+			mm = Mat.mult(mm, Mat.scalar(m.length, 1/i));
+			r = Mat.add(r, mm);
+			mm = Mat.mult(mm, m);
+		}
+		return r;
+	}
+}
+
+class SphericalCamera {
+
+	constructor () {
+		this.rotationMatrix = Mat.identity(4);
+		this.distance = 5;
+	}
+
+	rotateXY (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationXY(a), this.rotationMatrix);
+	}
+
+	rotateYZ (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationYZ(a), this.rotationMatrix);
+	}
+
+	rotateZX (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationZX(a), this.rotationMatrix);
+	}
+
+	matrix () {
+		return Mat.mult(Mat.translation([0, 0, -this.distance]), this.rotationMatrix);
+	}
+}
+
+class Frame {
+	constructor (canvas, pixelSize = 1) {
+		this.canvas = canvas;
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
+		this.mouseDown = false;
+		this.mouse = [0, 0];
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+		this.gl = canvas.getContext("experimental-webgl");
+		this.gl.uniformMatrix = (location, transpose, matrix) => {
+			let rows = matrix.length;
+			let columns = matrix[0].length;
+			let flat = new Float32Array(rows * columns);
+			for (let i = 0; i < rows; ++i) {	
+				for (let j = 0; j < columns; ++j) {
+					flat[j * rows + i] = matrix[i][j];
+				}
+			}
+			let functionName = 'uniformMatrix' + (rows == columns ? rows : rows + 'x' + columns) + 'fv';
+			this.gl[functionName](location, transpose, flat);
+		};
+		this.extensions = new Map();
+		this.pixelSize = pixelSize;
+		this.onResize();
+	}
+
+	getExtension (name) {
+		let ext;
+		if (!name in this.extensions) {
+			ext = this.gl.getExtension(name);
+			this.extensions[name] = ext;
+		} else {
+			ext = this.extensions[name];
+		}
+		return ext;
+	}
+
+	onResize () {
+		this.canvas.width  = this.canvas.clientWidth / this.pixelSize;
+		this.canvas.height = this.canvas.clientHeight / this.pixelSize;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown (event) {
+		this.mouseDown = true;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseUp (event) {
+		this.mouseDown = false;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseMove (event) {
+		let newMouse = [event.clientX, event.clientY];
+		this.mouseRelative = Vec.add(this.mouseRelative, Vec.sub(newMouse, this.mouse));
+		this.mouse = newMouse;
+	}
+
+	onMouseWheel (event) {
+		this.wheelRelative += event.wheelDelta / 120;
+	}
+
+	draw () {
+		let gl = this.gl;
+
+		this.processInput();
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+
+	processInputs () {
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+	}
+
+	createTexture (width, height) {
+		let gl = this.gl;
+
+		let texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		return texture;
+	}
+
+	createBuffer (vertices) {
+		let gl = this.gl;
+
+		let buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		return buffer;
+	}
+
+	loadShader(name, type) {
+		let gl = this.gl;
+
+		let script = assert(document.getElementById(name), "Shader " + name + " not found");
+		
+		let shader = gl.createShader(type);
+		gl.shaderSource(shader, script.textContent);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			throw new Error("Shader " + name + ": " + gl.getShaderInfoLog(shader));
+		}
+
+		return shader;
+	}
+
+	loadProgram(name) {
+		let gl = this.gl;
+
+		let program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			throw new Error("Program " + name + ": " + gl.getProgramInfoLog(program));
+		}
+
+		let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+		for (let u = 0; u < uniformCount; ++u) {
+			let uniformInfo = gl.getActiveUniform(program, u);
+			let name = uniformInfo.name;
+			let location = gl.getUniformLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location
+					};
+				},
+				set: (value) => {
+					if (uniformInfo.type == gl.FLOAT_MAT4) {
+						gl.uniformMatrix(location, false, value);
+					}
+				}
+			});
+		}
+
+		let attributeCount = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+		for (let a = 0; a < attributeCount; ++a) {
+			let attributeInfo = gl.getActiveAttrib(program, a);
+			let name = attributeInfo.name;
+			let location = gl.getAttribLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location,
+						enable: () => {
+							gl.enableVertexAttribArray(location);
+						}
+					};
+				},
+				set: (value) => { 
+					if (attributeInfo.type == gl.FLOAT_VEC3) {
+						gl.vertexAttribPointer(location, 3, gl.FLOAT, value[0], value[1], value[2]);
+					}
+				}
+			});
+		}
+
+		return program;
+	}
+}
+
+class RotationsFrame extends Frame {
+	constructor (canvas) {
+		super(canvas, 1);
+
+		let gl = this.gl;
+
+		this.program = this.loadProgram('render');
+		this.axes = this.createAxes(this.program);
+		this.cube = this.createCube(this.program);
+
+		this.camera = new SphericalCamera();
+		this.cameraDistance = this.camera.distance;
+	}
+
+	createAxes (program) {
+		let gl = this.gl;
+
+		let vertexBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+		let colorBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+				program.color_in.enable();
+				program.color_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.LINES, 0, 6);
+			}
+		}
+	}
+
+	createCube (program) {
+		let gl = this.gl;
+
+		let vertices = [];
+
+		let helper = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+
+		for (let i = 0; i < 4; ++i) {
+			let x = helper[i][0];
+			let y = helper[i][1];
+
+			vertices.push(x, y, -1);
+			vertices.push(x, y, 1);
+			vertices.push(x, -1, y);
+			vertices.push(x, 1, y);
+			vertices.push(-1, x, y);
+			vertices.push(1, x, y);
+		}
+
+		let vertexBuffer = this.createBuffer(vertices);
+		let colorBuffer = this.createBuffer(new Array(vertices.length).fill(1));
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+				program.color_in.enable();
+				program.color_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.LINES, 0, 24);
+			}
+		}
+	}
+
+	processInputs () {
+		if (this.mouseDown) {
+			// this.camera.rotateZX(this.mouseRelative[0] / 100.0);
+			// this.camera.rotateYZ(this.mouseRelative[1] / 100.0);
+
+			let generator = Mat.zero(4, 4);
+			let generatorX;
+			let generatorY;
+
+			let width = this.canvas.clientWidth / 2;
+			let height = this.canvas.clientHeight / 2;
+
+			if (this.mouse[0] >= width) {
+				let t = (this.mouse[0] - width) / width;
+				generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - (1 - t))));
+			} else {
+				let t = this.mouse[0] / width;
+				 generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorX, Mat.scalar(4, -this.mouseRelative[1] / 100)));
+
+			if (this.mouse[1] >= height) {
+				let t = (this.mouse[1] - height) / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, (1 - t))));
+			} else {
+				let t = this.mouse[1] / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorY, Mat.scalar(4, this.mouseRelative[0] / 100)));
+
+			let rotation = Mat.exp(generator);
+			this.camera.rotationMatrix = Mat.mult(rotation, this.camera.rotationMatrix);
+		}
+
+		this.cameraDistance *= Math.pow(0.8, this.wheelRelative);
+
+		this.camera.distance += (this.cameraDistance - this.camera.distance) * 0.6;
+
+		super.processInputs();
+	}
+
+	draw () {
+		let gl = this.gl;
+		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		gl.clearColor(0.7, 0.7, 0.7, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		let projection = Mat.frustum(0.01, 100.0, 0.01, 0.01);
+		let modelview = this.camera.matrix();
+
+		gl.useProgram(this.program);
+		this.program.projection = projection;
+		this.program.modelview = modelview;
+		this.axes.draw();
+		this.cube.draw();
+		gl.useProgram(null);
+	}
+}
+
+var frame;
+
+function init () {
+	let canvas = document.getElementById("main-canvas");
+	canvas.style.width = canvas.clientHeight;
+	frame = new RotationsFrame(canvas);
+
+	window.addEventListener('resize', () => {
+		canvas.style.width = canvas.clientHeight;
+		frame.onResize();
+		frame.draw();
+	});
+
+	frame.draw();
+
+	let drawInterval = 40;
+
+	setInterval(() => {
+		frame.processInputs();
+		frame.draw();
+	}, drawInterval);
+}
+
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+}
+#main-canvas {
+	position: absolute;
+	left: 0%;
+	top: 0%;
+	height: 100%;
+	width: 10;
+}
+</style>
+</head>
+<body onload="init();">
+
+<canvas id='main-canvas' >
+Your browser is a fucking loser.
+</canvas>
+
+</body>
+</html>
