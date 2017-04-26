@@ -322,6 +322,29 @@ class WavesFrame extends Frame {
 
 			return [wave, dwave, env];
 		};
+
+		this.presets['trap'] = () => {
+			var wave = this.emptyArray();
+			var dwave = this.emptyArray();
+			var env = this.emptyArray(10.0);
+			for (var x = 0; x < this.textureSize; ++x) {
+				for (var y = 0; y < this.textureSize; ++y) {
+					var offset = (x + y * this.textureSize);
+					var oy = y - this.textureSize/2;
+					var ox = x - this.textureSize/2;
+					let r = Math.sqrt(ox*ox + oy*oy);
+					let a = Math.floor(Math.atan2(oy, ox) / (Math.PI/8) - 0.5);
+					if (r > 30 && r < 35 && (a%2 == 0)) {
+						env[offset] = 0.0;
+					}
+					if (r < 30) {
+						wave[offset] = 100*Math.cos(r/30*Math.PI/2);
+					}
+				}
+			}
+
+			return [wave, dwave, env];
+		};
 	}
 
 	emptyArray (value = 0.0) {
@@ -690,6 +713,7 @@ Your browser is a fucking loser.
 <option value='standing'>Standing wave</option>
 <option value='double-slit'>Double-slit difraction</option>
 <option value='refraction'>Refraction</option>
+<option value='trap'>Trap</option>
 </select>
 </td>
 <td><input type='button' value='Load' onclick="frame.loadPreset(document.getElementById('preset').value);" style='width:100' /></td>
