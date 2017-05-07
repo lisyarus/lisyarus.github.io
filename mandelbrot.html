@@ -110,11 +110,9 @@ function onResize() {
 }
 
 function initGL() {
+	console.log("initGL()");
 	canvas = document.getElementById("main_canvas");
 	gl = canvas.getContext("experimental-webgl");
-
-	window.addEventListener('resize', onResize, false);
-	onResize();
 
 	program = loadProgram("shader");
 
@@ -125,6 +123,9 @@ function initGL() {
 	canvas.onmouseup = onMouseUp;
 	canvas.onmousemove = onMouseMove;
 	canvas.onmousewheel = onMouseWheel;
+
+	window.addEventListener('resize', onResize, false);
+	onResize();
 
 	//setInterval(() => { step(0.016); }, 16);
 }
@@ -138,6 +139,7 @@ function step(dt) {
 }
 
 function paintGL() {
+	console.log("paintGL()");
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
 	gl.clearColor(0, 0, 0.1, 1);
@@ -229,7 +231,7 @@ void main(){
 }
 </style>
 </head>
-<body onload="initGL();paintGL();">
+<body onload="initGL();">
 
 <canvas id="main_canvas" >
 Your browser is a fucking loser.
