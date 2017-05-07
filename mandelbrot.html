@@ -1,14 +1,21 @@
 <html>
 <head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script type="text/javascript">
 
-function loadShader(name, type) {
+function loadShader(name, type, replaceMap = null) {
 	var script = document.getElementById(name);
 	if (!script)
 		return null;
 	
 	var shader = gl.createShader(type);
-	gl.shaderSource(shader, script.textContent);
+	var source = script.textContent;
+	if (replaceMap) {
+		for (key in replaceMap) {
+			source = source.replace(key, replaceMap[key]);
+		}
+	}
+	gl.shaderSource(shader, source);
 	gl.compileShader(shader);
 
 	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -19,10 +26,10 @@ function loadShader(name, type) {
 	return shader;
 }
 
-function loadProgram(name) {
+function loadProgram(name, replaceMap = null) {
 	var program = gl.createProgram();
-	gl.attachShader(program, loadShader(name+"-vs", gl.VERTEX_SHADER));
-	gl.attachShader(program, loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+	gl.attachShader(program, loadShader(name+"-vs", gl.VERTEX_SHADER, replaceMap));
+	gl.attachShader(program, loadShader(name+"-fs", gl.FRAGMENT_SHADER, replaceMap));
 	gl.linkProgram(program);
 
 	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -109,12 +116,39 @@ function onResize() {
 	update();
 }
 
+function get (name) {
+	var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+	if (results) {
+		return results[1];
+	} else {
+		return null;
+	}
+}
+
 function initGL() {
-	console.log("initGL()");
 	canvas = document.getElementById("main_canvas");
 	gl = canvas.getContext("experimental-webgl");
 
-	program = loadProgram("shader");
+	let p = get("pow");
+	if (p) {
+		p = Number(p);
+	} else {
+		p = 2;
+	}
+
+	var fractal_func = "vec2 r = vec2(1,0);";
+	while (p > 0) {
+		if (p % 2 == 1) {
+			fractal_func += "r = c_mult(r, t);";
+		}
+		p = Math.floor(p / 2);
+		if (p > 0) {
+			fractal_func += "t = c_mult(t, t);"
+		}
+	}
+	fractal_func += "return r+z;";
+
+	program = loadProgram("shader", {"FRACTAL_FUNC": fractal_func});
 
 	buffer = loadBuffer([-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0]);
 	count = 6;
@@ -139,7 +173,6 @@ function step(dt) {
 }
 
 function paintGL() {
-	console.log("paintGL()");
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
 	gl.clearColor(0, 0, 0.1, 1);
@@ -204,12 +237,24 @@ vec4 get_color (float t)
 	}
 }
 
+vec2 c_mult (vec2 a, vec2 b)
+{
+	return vec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x);
+}
+
+vec2 fractal_func (vec2 t, vec2 z)
+{
+	FRACTAL_FUNC
+}
+
 void main(){
 	float c;
 	vec2 t = vec2(0.0, 0.0);
 	const int m = 50;
 	for (int i = 0; i < m; ++i) {
-		t = vec2(t.x*t.x - t.y*t.y + z.x, 2.0*t.x*t.y + z.y);
+		//t = vec2(t.x*t.x - t.y*t.y + z.x, 2.0*t.x*t.y + z.y);
+		//t = c_pow4(t) + z;
+		t = fractal_func(t, z);
 		if (length(t) > 2.0 || i + 1 == m)
 		{
 			c = float(i) / float(m);
