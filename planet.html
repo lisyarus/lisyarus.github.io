@@ -1,0 +1,876 @@
+<html>
+<head>
+<script id="render-vs" type="text/glsl">
+precision mediump float;
+
+uniform mat4 modelview;
+uniform mat4 projection;
+uniform vec4 color;
+
+attribute vec3 vertex_in;
+attribute vec3 color_in;
+
+varying vec3 color_var;
+
+void main(){
+	gl_PointSize = 5.0;
+	if (color.w == 0.0)
+		color_var = color_in;
+	else
+		color_var = color.xyz;
+	gl_Position = projection * modelview * vec4(vertex_in, 1.0);
+}
+
+</script>
+<script id="render-fs" type="text/glsl">
+precision mediump float;
+
+varying vec3 color_var;
+
+void main(){
+	gl_FragColor = vec4(color_var, 1.0);
+}
+
+</script>
+<script type="text/javascript">
+'use strict';
+
+function assert (condition, message = "Assertion failed") {
+	if (!condition) {
+		throw new Error(message);
+	}
+	return condition;
+}
+
+class Vec {
+
+	static _checkLength (v1, v2) {
+		assert(v1.length == v2.length, "Vectors should have the same length");
+	}
+
+	static zero (length) {
+		let r = new Array(length);
+		for (let i = 0; i < length; ++i) {
+			r[i] = 0;
+		}
+		return r;
+	}
+	
+	static add (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] + v2[i];
+		}
+		return v;
+	}
+
+	static sub (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] - v2[i];
+		}
+		return v;
+	}
+
+	static mult (v, s) {
+		let r = new Array(v.length);
+		for (let i = 0; i < v.length; ++i) {
+			r[i] = v[i] * s;
+		}
+		return r;
+	}
+
+	static dot (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let result = 0.0;
+		for (let i = 0; i < v1.length; ++i) {
+			result += v1[i] * v2[i];
+		}
+		return result;
+	}
+
+	static norm (v) {
+		return Math.sqrt(Vec.dot(v, v));
+	}
+
+	static normalized (v) {
+		return Vec.mult(v, 1.0 / Vec.norm(v));
+	}
+
+	static det3 (v0, v1, v2) {
+		return 0.0
+			+ v0[0] * v1[1] * v2[2]
+			- v0[0] * v1[2] * v2[1]
+			- v0[1] * v1[0] * v2[2]
+			+ v0[1] * v1[2] * v2[0]
+			+ v0[2] * v1[0] * v2[1]
+			- v0[2] * v1[1] * v2[0]
+		;
+	}
+
+	static volume3 (v0, v1, v2, v3) {
+		return Vec.det3(Vec.sub(v1, v0), Vec.sub(v2, v0), Vec.sub(v3, v0));
+	}
+
+}
+
+class Mat {
+
+	static empty (rows, columns) {
+		let m = new Array(rows);
+		for (let i = 0; i < rows; ++i) {
+			m[i] = new Array(columns);
+		}
+		return m;
+	}
+
+	static zero (rows, columns) {
+		let m = Mat.empty(rows, columns);
+		for (let i = 0; i < rows; ++i) {	
+			for (let j = 0; j < columns; ++j) {
+				m[i][j] = 0;
+			}
+		}
+		return m;
+	}
+
+	static scalar (size, value) {
+		let m = Mat.zero(size, size);
+		for (let i = 0; i < size; ++i) {
+			m[i][i] = value;
+		}
+		return m;
+	}
+
+	static identity (size) {
+		return Mat.scalar(size, 1);
+	}
+
+	static ortho (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = 1 / right;
+		m[1][1] = 1 / top;
+		m[2][2] = - 2 / (far - near);
+		m[2][3] = - (far + near) / (far - near);
+		m[3][3] = 1;
+		return m;
+	}
+
+	static frustum (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = near / right;
+		m[1][1] = near / top;
+		m[2][2] = - (far + near) / (far - near);
+		m[2][3] = - 2 * far * near / (far - near);
+		m[3][2] = -1;
+		return m;
+	}
+
+	static add (m1, m2) {
+		assert(m1.length == m2.length && m1[0].length == m2[0].length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+
+		let r = Mat.empty(size1, size2);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				r[i][j] = m1[i][j] + m2[i][j];
+			}
+		}
+
+		return r;
+	}
+
+	static mult (m1, m2) {
+		assert(m1[0].length == m2.length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+		let size3 = m2[0].length;
+
+		let r = Mat.zero(size1, size3);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				for (let k = 0; k < size3; ++k) {
+					r[i][k] += m1[i][j] * m2[j][k];
+				}
+			}
+		}
+
+		return r;
+	}
+
+	static rotationXY (a) {
+		let r = Mat.identity(4);
+		r[0][0] = Math.cos(a);
+		r[0][1] = -Math.sin(a);
+		r[1][0] = Math.sin(a);
+		r[1][1] = Math.cos(a);
+		return r;
+	}
+
+	static rotationYZ (a) {
+		let r = Mat.identity(4);
+		r[1][1] = Math.cos(a);
+		r[1][2] = -Math.sin(a);
+		r[2][1] = Math.sin(a);
+		r[2][2] = Math.cos(a);
+		return r;
+	}
+
+	static rotationZX (a) {
+		let r = Mat.identity(4);
+		r[2][2] = Math.cos(a);
+		r[2][0] = -Math.sin(a);
+		r[0][2] = Math.sin(a);
+		r[0][0] = Math.cos(a);
+		return r;
+	}
+
+	static rotationGeneratorXY () {
+		let r = Mat.zero(4, 4);
+		r[0][0] = 0;
+		r[0][1] = -1;
+		r[1][0] = 1;
+		r[1][1] = 0;
+		return r;
+	}
+
+	static rotationGeneratorYZ () {
+		let r = Mat.zero(4, 4);
+		r[1][1] = 0;
+		r[1][2] = -1;
+		r[2][1] = 1;
+		r[2][2] = 0;
+		return r;
+	}
+
+	static rotationGeneratorZX (a) {
+		let r = Mat.zero(4, 4);
+		r[2][2] = 0;
+		r[2][0] = -1;
+		r[0][2] = 1;
+		r[0][0] = 0;
+		return r;
+	}
+
+	static translation (v) {
+		let r = Mat.identity(4);
+		r[0][3] = v[0];
+		r[1][3] = v[1];
+		r[2][3] = v[2];
+		return r;
+	}
+
+	static exp (m) {
+		let r = Mat.identity(m.length);
+		let mm = m;
+		for (let i = 1; i < 10; ++i) {
+			mm = Mat.mult(mm, Mat.scalar(m.length, 1/i));
+			r = Mat.add(r, mm);
+			mm = Mat.mult(mm, m);
+		}
+		return r;
+	}
+}
+
+class SphericalCamera {
+
+	constructor () {
+		this.rotationMatrix = Mat.identity(4);
+		this.distance = 2;
+	}
+
+	rotateXY (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationXY(a), this.rotationMatrix);
+	}
+
+	rotateYZ (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationYZ(a), this.rotationMatrix);
+	}
+
+	rotateZX (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationZX(a), this.rotationMatrix);
+	}
+
+	matrix () {
+		return Mat.mult(Mat.translation([0, 0, -this.distance]), this.rotationMatrix);
+	}
+}
+
+class Frame {
+	constructor (canvas, pixelSize = 1) {
+		this.canvas = canvas;
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
+		this.mouseDown = false;
+		this.mouse = [0, 0];
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+		this.gl = canvas.getContext("experimental-webgl");
+		this.gl.uniformMatrix = (location, transpose, matrix) => {
+			let rows = matrix.length;
+			let columns = matrix[0].length;
+			let flat = new Float32Array(rows * columns);
+			for (let i = 0; i < rows; ++i) {	
+				for (let j = 0; j < columns; ++j) {
+					flat[j * rows + i] = matrix[i][j];
+				}
+			}
+			let functionName = 'uniformMatrix' + (rows == columns ? rows : rows + 'x' + columns) + 'fv';
+			this.gl[functionName](location, transpose, flat);
+		};
+		this.extensions = new Map();
+		this.pixelSize = pixelSize;
+		this.onResize();
+	}
+
+	getExtension (name) {
+		let ext;
+		if (!name in this.extensions) {
+			ext = this.gl.getExtension(name);
+			this.extensions[name] = ext;
+		} else {
+			ext = this.extensions[name];
+		}
+		return ext;
+	}
+
+	onResize () {
+		this.canvas.width  = this.canvas.clientWidth / this.pixelSize;
+		this.canvas.height = this.canvas.clientHeight / this.pixelSize;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown (event) {
+		this.mouseDown = true;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseUp (event) {
+		this.mouseDown = false;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseMove (event) {
+		let newMouse = [event.clientX, event.clientY];
+		this.mouseRelative = Vec.add(this.mouseRelative, Vec.sub(newMouse, this.mouse));
+		this.mouse = newMouse;
+	}
+
+	onMouseWheel (event) {
+		this.wheelRelative += event.wheelDelta / 120;
+	}
+
+	draw () {
+		let gl = this.gl;
+
+		this.processInput();
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+
+	processInputs () {
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+	}
+
+	createTexture (width, height) {
+		let gl = this.gl;
+
+		let texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		return texture;
+	}
+
+	createBuffer (vertices) {
+		let gl = this.gl;
+
+		let buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		return buffer;
+	}
+
+	loadShader(name, type) {
+		let gl = this.gl;
+
+		let script = assert(document.getElementById(name), "Shader " + name + " not found");
+		
+		let shader = gl.createShader(type);
+		gl.shaderSource(shader, script.textContent);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			throw new Error("Shader " + name + ": " + gl.getShaderInfoLog(shader));
+		}
+
+		return shader;
+	}
+
+	loadProgram(name) {
+		let gl = this.gl;
+
+		let program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			throw new Error("Program " + name + ": " + gl.getProgramInfoLog(program));
+		}
+
+		let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+		for (let u = 0; u < uniformCount; ++u) {
+			let uniformInfo = gl.getActiveUniform(program, u);
+			let name = uniformInfo.name;
+			let location = gl.getUniformLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location
+					};
+				},
+				set: (value) => {
+					if (uniformInfo.type == gl.FLOAT_VEC4) {
+						gl.uniform4fv(location, value);
+					}
+					if (uniformInfo.type == gl.FLOAT_MAT4) {
+						gl.uniformMatrix(location, false, value);
+					}
+				}
+			});
+		}
+
+		let attributeCount = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+		for (let a = 0; a < attributeCount; ++a) {
+			let attributeInfo = gl.getActiveAttrib(program, a);
+			let name = attributeInfo.name;
+			let location = gl.getAttribLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location,
+						enable: () => {
+							gl.enableVertexAttribArray(location);
+						},
+						disable: () => {
+							gl.disableVertexAttribArray(location);
+						}
+					};
+				},
+				set: (value) => { 
+					if (attributeInfo.type == gl.FLOAT_VEC3) {
+						gl.vertexAttribPointer(location, 3, gl.FLOAT, value[0], value[1], value[2]);
+					}
+				}
+			});
+		}
+
+		return program;
+	}
+}
+
+class PlanetFrame extends Frame {
+	constructor (canvas) {
+		super(canvas, 1);
+
+		let gl = this.gl;
+
+		this.program = this.loadProgram('render');
+		this.axes = this.createAxes(this.program);
+
+		this.camera = new SphericalCamera();
+		this.cameraDistance = this.camera.distance;
+
+		this.objects = [];
+
+		this.stage = 0;
+
+		this.stages = [this.generatePoints, this.uniformizePoints, this.triangulatePoints];
+
+		this.maxPointCount = 128;
+	}
+
+	createAxes (program) {
+		let gl = this.gl;
+
+		let vertexBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+		let colorBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+				program.color_in.enable();
+				program.color_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.LINES, 0, 6);
+			}
+		}
+	}
+
+	processInputs () {
+		if (this.mouseDown) {
+			// this.camera.rotateZX(this.mouseRelative[0] / 100.0);
+			// this.camera.rotateYZ(this.mouseRelative[1] / 100.0);
+
+			let generator = Mat.zero(4, 4);
+			let generatorX;
+			let generatorY;
+
+			let width = this.canvas.clientWidth / 2;
+			let height = this.canvas.clientHeight / 2;
+
+			if (this.mouse[0] >= width) {
+				let t = (this.mouse[0] - width) / width;
+				generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - (1 - t))));
+			} else {
+				let t = this.mouse[0] / width;
+				 generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorX, Mat.scalar(4, -this.mouseRelative[1] / 100)));
+
+			if (this.mouse[1] >= height) {
+				let t = (this.mouse[1] - height) / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, (1 - t))));
+			} else {
+				let t = this.mouse[1] / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorY, Mat.scalar(4, this.mouseRelative[0] / 100)));
+
+			let rotation = Mat.exp(generator);
+			this.camera.rotationMatrix = Mat.mult(rotation, this.camera.rotationMatrix);
+		}
+
+		this.cameraDistance *= Math.pow(0.8, this.wheelRelative);
+
+		this.camera.distance += (this.cameraDistance - this.camera.distance) * 0.6;
+
+		super.processInputs();
+	}
+
+	runStep() {
+		if (this.stage < this.stages.length) {
+			if (this.stages[this.stage].bind(this)()) {
+				console.log('Finished stage ' + this.stages[this.stage].name);
+				this.stage += 1;
+			}
+		}
+	}
+
+	generatePoints() {
+		let steps = 2;
+
+		let gl = this.gl;
+		let program = this.program;
+
+		if (typeof(this.points) == 'undefined') {
+			this.points = [];
+
+			this.pointsObject = {
+				draw: () => {
+					gl.bindBuffer(gl.ARRAY_BUFFER, this.pointsVertexBuffer);
+					program.vertex_in.enable();
+					program.vertex_in = [false, 0, 0];
+					gl.bindBuffer(gl.ARRAY_BUFFER, null);
+					program.color_in.disable();
+					program.color = [1.0, 1.0, 1.0, 1.0];
+					gl.drawArrays(gl.POINTS, 0, this.points.length);
+				}
+			};
+			this.objects.push(this.pointsObject);
+		}
+
+		for (let s = 0; s < steps; ++s) {
+			let point = Array.from({length: 3}, () => Math.random() * 2.0 - 1.0);
+			point = Vec.normalized(point);
+			this.points.push(point);
+		}
+
+		let vertices = [].concat.apply([], this.points);
+		this.pointsVertexBuffer = this.createBuffer(vertices);
+
+		if (this.points.length == this.maxPointCount)
+			return true;
+		else
+			return false;
+	}
+
+	uniformizePoints() {
+		if (typeof(this.uniformizeEnergy) == 'undefined') {
+			this.uniformizeEnerge = Infinity;
+		}
+
+		let steps = 1;
+		let eps = 0.01 / this.points.length;
+		let threshold = 0.1 * this.points.length * this.points.length;
+
+		for (let s = 0; s < steps; ++s) {
+			let gradient = Array(this.points.length).fill([0.0, 0.0, 0.0]);
+			
+			for (let i = 0; i < this.points.length; ++i) {
+				for (let j = i+1; j < this.points.length; ++j) {
+					let dot = Vec.dot(this.points[i], this.points[j]);
+					let s = 1.0 / (1.0 - dot);
+					s = s * s;
+					if (s > threshold) s = threshold;
+					gradient[i] = Vec.add(gradient[i], Vec.mult(this.points[j], s));
+					gradient[j] = Vec.add(gradient[j], Vec.mult(this.points[i], s));
+				}
+			}
+
+			for (let i = 0; i < this.points.length; ++i) {
+				this.points[i] = Vec.normalized(Vec.add(this.points[i], Vec.mult(gradient[i], -eps)));
+			}
+		}
+
+		let vertices = [].concat.apply([], this.points);
+		this.pointsVertexBuffer = this.createBuffer(vertices);
+
+		let newEnergy = 0.0;
+
+		for (let i = 0; i < this.points.length; ++i) {
+			for (let j = i+1; j < this.points.length; ++j) {
+				let dot = Vec.dot(this.points[i], this.points[j]);
+				let s = 1.0 / (1.0 - dot);
+				newEnergy += s * s;
+			}
+		}
+		
+		if (Math.abs(this.uniformizeEnergy - newEnergy) / newEnergy < 0.01)
+			return true;
+
+		this.uniformizeEnergy = newEnergy;
+
+		return false;
+	}
+
+	triangulatePoints() {
+		let gl = this.gl;
+		let program = this.program;
+
+		if (typeof(this.triangulation) == 'undefined') {
+			this.triangulation = [];
+			this.triangulateQueue = [0];
+			this.triangulateVisited = Array(this.points.length).fill(false);
+
+			this.triangulationTrianglesObject = {
+				draw: () => {
+					gl.bindBuffer(gl.ARRAY_BUFFER, this.triangulationTrianglesVertexBuffer);
+					program.vertex_in.enable();
+					program.vertex_in = [false, 0, 0];
+					gl.bindBuffer(gl.ARRAY_BUFFER, null);
+					program.color_in.disable();
+					program.color = [0.0, 0.0, 1.0, 1.0];
+					gl.drawArrays(gl.TRIANGLES, 0, this.triangulation.length * 3);
+				}
+			};
+			this.objects.push(this.triangulationTrianglesObject);
+
+			this.triangulationEdgesObject = {
+				draw: () => {
+					gl.bindBuffer(gl.ARRAY_BUFFER, this.triangulationEdgesVertexBuffer);
+					program.vertex_in.enable();
+					program.vertex_in = [false, 0, 0];
+					gl.bindBuffer(gl.ARRAY_BUFFER, null);
+					program.color_in.disable();
+					program.color = [0.0, 0.0, 0.0, 1.0];
+					gl.drawArrays(gl.LINES, 0, this.triangulation.length * 6);
+				}
+			};
+			this.objects.push(this.triangulationEdgesObject);
+		}
+
+		let index = this.triangulateQueue.splice(0, 1)[0];
+
+		let nearestIndex = null;
+		let nearestDot = -1.0;
+		for (let i = 0; i < this.points.length; ++i) {
+			if (i == index) continue;
+
+			let dot = Vec.dot(this.points[index], this.points[i]);
+			if (dot > nearestDot) {
+				nearestIndex = i;
+				nearestDot = dot;
+			}
+		}
+
+		let skirt = [nearestIndex];
+		while (true) {
+			let current = skirt[skirt.length - 1];
+			let next = null;
+			let candidates = Array(this.points.length).fill().map((v,i) => i);
+			
+			candidates.splice(candidates.indexOf(index), 1);
+			candidates.splice(candidates.indexOf(current), 1);
+
+			while (true) {
+				let c = candidates[0];
+				let found = true;
+
+				let newCandidates = [];
+
+				for (let i = 1; i < candidates.length; ++i) {
+					if (Vec.volume3(this.points[index], this.points[current], this.points[c], this.points[candidates[i]]) > 0.0) {
+						found = false;
+						newCandidates.push(candidates[i]);
+					}
+				}
+
+				if (found) {
+					next = c;
+					break;
+				} else {
+					candidates = newCandidates;
+				}
+			}
+
+			/*
+			for (let i = 0; i < this.points.length; ++i) {
+				if (i == index || i == current) continue;
+				let found = true;
+
+				for (let j = 0; j < this.points.length; ++j) {
+					if (j == index || j == current || j == i) continue;
+
+					if (Vec.volume3(this.points[index], this.points[current], this.points[i], this.points[j]) > 0.0) {
+						found = false;
+						break;
+					}
+				}
+
+				if (found) {
+					next = i;
+					break;
+				}
+			}
+			*/
+
+			if (next == skirt[0]) {
+				break;
+			}
+
+			skirt.push(next);
+		}
+
+		for (let i = 0; i < skirt.length; ++i) {
+			let a = skirt[i];
+			let b = skirt[(i + 1) % skirt.length];
+			if (!this.triangulateVisited[a] && !this.triangulateVisited[b])
+				this.triangulation.push([index, a, b]);
+
+			if (!this.triangulateVisited[a] && this.triangulateQueue.indexOf(a) == -1)
+				this.triangulateQueue.push(a);
+		}
+
+		this.triangulateVisited[index] = true;
+
+		let triangulationPoints = [];
+		let triangulationEdgesPoints = [];
+		for (let t = 0; t < this.triangulation.length; ++t) {
+			let tri = this.triangulation[t];
+			for (let i = 0; i < 3; ++i) {
+				triangulationPoints.push(this.points[tri[i]]);
+				triangulationEdgesPoints.push(this.points[tri[i]]);
+				triangulationEdgesPoints.push(this.points[tri[(i + 1) % 3]]);
+			}
+		}
+
+		let triangulationVertices = [].concat.apply([], triangulationPoints);
+		this.triangulationTrianglesVertexBuffer = this.createBuffer(triangulationVertices);
+
+		let triangulationEdgesVertices = [].concat.apply([], triangulationEdgesPoints);
+		this.triangulationEdgesVertexBuffer = this.createBuffer(triangulationEdgesVertices);
+
+		return this.triangulateQueue.length == 0;
+	}
+
+	draw () {
+		this.runStep();
+
+		let gl = this.gl;
+		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		gl.clearColor(0.7, 0.7, 0.7, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		gl.enable(gl.DEPTH_TEST);
+		gl.depthFunc(gl.LEQUAL);
+
+		//gl.enable(gl.CULL_FACE);
+		//gl.cullFace(gl.BACK);
+
+		gl.lineWidth(5);
+
+		let projection = Mat.frustum(0.01, 100.0, 0.01 * this.canvas.clientWidth / this.canvas.clientHeight, 0.01);
+		let modelview = this.camera.matrix();
+
+		gl.useProgram(this.program);
+		this.program.projection = projection;
+		this.program.modelview = modelview;
+		for (let i = 0; i < this.objects.length; ++i)
+			this.objects[i].draw();
+		gl.useProgram(null);
+	}
+}
+
+var frame;
+
+function init () {
+	let canvas = document.getElementById("main-canvas");
+	frame = new PlanetFrame(canvas);
+
+	window.addEventListener('resize', () => {
+		frame.onResize();
+		frame.draw();
+	});
+
+	frame.draw();
+
+	let drawInterval = 40;
+
+	setInterval(() => {
+		frame.processInputs();
+		frame.draw();
+	}, drawInterval);
+}
+
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+}
+#main-canvas {
+	position: absolute;
+	left: 0%;
+	top: 0%;
+	height: 100%;
+	width: 100%;
+}
+</style>
+</head>
+<body onload="init();">
+
+<canvas id='main-canvas' >
+Your browser is a fucking loser.
+</canvas>
+
+</body>
+</html>
