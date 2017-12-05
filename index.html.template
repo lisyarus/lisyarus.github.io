@@ -11,7 +11,11 @@ a:hover {
 }
 </style>
 </head>
-<body>
-LINKS
+<body bgcolor='#eee'>
+<center>
+<table width='40%'>
+$LINKS
+</table>
+</center>
 </body>
 </html>
