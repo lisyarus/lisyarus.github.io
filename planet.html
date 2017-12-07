@@ -554,6 +554,7 @@ class PlanetFrame extends Frame {
 	}
 
 	processInputs () {
+		// TODO: rotation inertia
 		if (this.mouseDown) {
 			// this.camera.rotateZX(this.mouseRelative[0] / 100.0);
 			// this.camera.rotateYZ(this.mouseRelative[1] / 100.0);
@@ -570,7 +571,7 @@ class PlanetFrame extends Frame {
 				generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - (1 - t))));
 			} else {
 				let t = this.mouse[0] / width;
-				 generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - t)));
+				generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - t)));
 			}
 			generator = Mat.add(generator, Mat.mult(generatorX, Mat.scalar(4, -this.mouseRelative[1] / 100)));
 
@@ -582,6 +583,7 @@ class PlanetFrame extends Frame {
 				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, t)));
 			}
 			generator = Mat.add(generator, Mat.mult(generatorY, Mat.scalar(4, this.mouseRelative[0] / 100)));
+			generator = Mat.mult(generator, Mat.scalar(4, 0.5));
 
 			let rotation = Mat.exp(generator);
 			this.camera.rotationMatrix = Mat.mult(rotation, this.camera.rotationMatrix);
