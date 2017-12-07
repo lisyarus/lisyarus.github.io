@@ -306,6 +306,9 @@ class Frame {
 		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
 		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
 		this.canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
+		this.canvas.addEventListener('touchstart', (event) => { this.onTouchStart(event); }, false);
+		this.canvas.addEventListener('touchend', (event) => { this.onTouchEnd(event); }, false);
+		this.canvas.addEventListener('touchmove', (event) => { this.onTouchMove(event); }, false);
 		this.mouseDown = false;
 		this.mouse = [0, 0];
 		this.mouseRelative = [0, 0];
@@ -360,6 +363,32 @@ class Frame {
 		let newMouse = [event.clientX, event.clientY];
 		this.mouseRelative = Vec.add(this.mouseRelative, Vec.sub(newMouse, this.mouse));
 		this.mouse = newMouse;
+	}
+
+	onTouchStart (event) {
+		if (event.touches.length == 1) {
+			this.mouseDown = true;
+		}
+
+		if (event.touches.length >= 1) {
+			this.mouse = [event.touches[0].clientX, event.touches[0].clientY];
+		}
+	}
+
+	onTouchEnd (event) {
+		if (event.touches.length >= 1) {
+			this.mouse = [event.touches[0].clientX, event.touches[0].clientY];
+		} else {
+			this.mouseDown = false;
+		}
+	}
+
+	onTouchMove (event) {
+		if (event.touches.length >= 1) {
+			let newMouse = [event.touches[0].clientX, event.touches[0].clientY];
+			this.mouseRelative = Vec.add(this.mouseRelative, Vec.sub(newMouse, this.mouse));
+			this.mouse = newMouse;
+		}
 	}
 
 	onMouseWheel (event) {
