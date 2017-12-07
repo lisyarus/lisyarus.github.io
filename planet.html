@@ -42,6 +42,10 @@ function assert (condition, message = "Assertion failed") {
 	return condition;
 }
 
+function randomGaussian() {
+	return Math.sqrt(-2.0 * Math.log(Math.random())) * Math.cos(2.0 * Math.PI * Math.random());
+}
+
 class Vec {
 
 	static _checkLength (v1, v2) {
@@ -530,7 +534,7 @@ class PlanetFrame extends Frame {
 
 		this.stages = [this.generatePoints, this.uniformizePoints, this.triangulatePoints];
 
-		this.maxPointCount = 128;
+		this.maxPointCount = 192;
 	}
 
 	createAxes (program) {
@@ -629,7 +633,8 @@ class PlanetFrame extends Frame {
 		}
 
 		for (let s = 0; s < steps; ++s) {
-			let point = Array.from({length: 3}, () => Math.random() * 2.0 - 1.0);
+			//let point = Array.from({length: 3}, () => Math.random() * 2.0 - 1.0);
+			let point = Array.from({length: 3}, () => randomGaussian());
 			point = Vec.normalized(point);
 			this.points.push(point);
 		}
