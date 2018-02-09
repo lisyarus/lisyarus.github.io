@@ -1,0 +1,6 @@
+	<tr><td><a href='$NAME.html'>
+		<div class='container'>
+		<img width='100%' src='screenshots/$NAME.png'>
+		<div class='bottom-text'>$RNAME</div>
+		</div>
+	</a></td></tr>
