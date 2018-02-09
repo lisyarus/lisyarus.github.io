@@ -577,6 +577,7 @@ class WavesFrame extends Frame {
 }
 
 var frame;
+var running = true;
 
 function init () {
 	var canvas = document.getElementById("main-canvas");
@@ -596,7 +597,10 @@ function init () {
 
 	var dt = 20;
 
-	setInterval(() => { frame.step(dt * 0.001); frame.draw(); }, dt/4);
+	setInterval(() => {
+		frame.step(running ? dt * 0.001 : 0.0);
+		frame.draw();
+	}, dt/2);
 }
 
 </script>
@@ -636,6 +640,12 @@ function init () {
 	position: absolute;
 	left: 550;
 	top: 150;
+}
+#pause{
+	position: absolute;
+	left: 550;
+	top: 200;
+	width: 100;
 }
 #clear{
 	position: absolute;
@@ -722,6 +732,7 @@ Your browser is a fucking loser.
 </tr>
 </table>
 
+<input type='button' id='pause' value="Pause" onclick="running = !running; this.value=running ? 'Pause' : 'Run';" />
 <input type='button' id='clear' value="Clear" onclick="frame.clear();" />
 <input type='button' id='clear-wave' value="Clear waves" onclick="frame.clearWave();" />
 <input type='button' id='clear-env' value="Clear medium" onclick="frame.clearEnv();" />
