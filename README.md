@@ -1,3 +1,1 @@
-WebGL experiments.
-
-Try at http://lisyarus.github.io
+http://lisyarus.github.io
