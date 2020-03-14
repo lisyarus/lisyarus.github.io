@@ -1,0 +1,1434 @@
+<html>
+<head>
+<script id="render-vs" type="text/glsl">#version 300 es
+precision highp float;
+
+uniform float scale;
+uniform mat4 view;
+
+in vec2 vertex_in;
+
+out vec3 o;
+out vec3 d;
+
+void main(){
+	gl_Position = vec4(vertex_in, 0.0, 1.0);
+
+	mat3 rot = mat3(view);
+	o = rot * vec3(vertex_in * scale, 0.0);
+	d = rot * vec3(0.0, 0.0, -1.0);
+}
+
+</script>
+<script id="render-fs" type="text/glsl">#version 300 es
+precision highp float;
+
+uniform float amplification;
+uniform float isosurface;
+uniform int render_mode;
+uniform int color_mode;
+uniform int max_steps;
+
+uniform vec3 bbox0;
+uniform vec3 bbox1;
+uniform ivec3 texSize;
+uniform highp sampler3D tex;
+uniform float M;
+
+in vec3 o;
+in vec3 d;
+
+out vec4 out_color;
+
+vec2 sort2 (vec2 v)
+{
+	return vec2(min(v[0], v[1]), max(v[0], v[1]));
+}
+
+float func (vec3 p)
+{
+	vec3 s = (p - bbox0) / (bbox1 - bbox0);
+	float v = texture(tex, s).r;
+	if (false && p.x > 0.0)
+		v *= exp(-10.0*p.x*p.x);
+	return v;
+}
+
+void main() {
+	vec2 trange;
+	{
+		vec3 t0 = (bbox0 - o) / d;
+		vec3 t1 = (bbox1 - o) / d;
+
+		vec2 tx = sort2(vec2(t0.x, t1.x));
+		vec2 ty = sort2(vec2(t0.y, t1.y));
+		vec2 tz = sort2(vec2(t0.z, t1.z));
+
+		trange.x = max(tx.x, max(ty.x, tz.x));
+		trange.y = min(tx.y, min(ty.y, tz.y));
+	}
+
+	const vec3 bgcolor = vec3(1.0, 1.0, 1.0);
+
+	vec3 acc_color = vec3(0.0, 0.0, 0.0);
+	float acc_opacity = 0.0;
+	vec3 acc_n = vec3(0.0, 0.0, 0.0);
+
+	vec3 p;
+
+	if (trange.x < trange.y)
+	{
+		const float eps = 1e-1;
+		int steps = max_steps;
+		float dt = (trange.y - trange.x) / float(steps);
+
+		if (render_mode == 1) {
+
+
+			float vprev;
+
+			for (int step = 0; step < 256; ++step) {
+				if (step >= steps) break;
+				float t = trange.x + (float(step) + 0.5) * dt;
+				p = o + d * t;
+		
+				float v = func(p);
+				if (abs(v) > isosurface) {
+					if (step > 0) {
+						// vprev * (1-s) + v * s = isosurface
+						// s * (v - vprev) = ospsirface - vprev
+
+						float s = (isosurface - abs(vprev)) / (abs(v) - abs(vprev));
+						t = trange.x + (float(step) - 0.5 + s) * dt;
+						p = o + d * t;
+						v = func(p);
+					}
+
+					if (v > 0.0)
+						acc_color = vec3(1.0, 0.0, 0.0);
+					else
+						acc_color = vec3(0.0, 0.0, 1.0);
+					acc_opacity = 1.0;
+
+					float vx = func(p + vec3(eps, 0.0, 0.0));
+					float vy = func(p + vec3(0.0, eps, 0.0));
+					float vz = func(p + vec3(0.0, 0.0, eps));
+
+					vec3 g = (vec3(vx, vy, vz) - vec3(v, v, v)) / eps;
+					if (v > 0.0) g *= -1.0;
+					acc_n = g;
+
+					
+					break;
+				}
+
+				vprev = v;
+			}
+
+		} else if (render_mode == 0) {
+			for (int step = 0; step < 256; ++step) {
+				if (step >= steps) break;
+
+				float t = trange.x + (float(step) + 0.5) * dt;
+				p = o + d * t;
+				float v = func(p) * amplification;
+
+				vec3 c;
+				if (v > 0.0) c = vec3(1.0, 0.0, 0.0);
+				else c = vec3(0.0, 0.0, 1.0);
+
+				float a = min(1.0, v*v * dt);
+
+				acc_color += (1.0 - acc_opacity) * a * c;
+				acc_opacity += (1.0 - acc_opacity) * a;
+			}
+		}
+	}
+
+	if (acc_opacity == 0.0) {
+		out_color = vec4(bgcolor, 1.0);
+		return;
+	}
+
+	acc_color /= acc_opacity;
+
+	if (render_mode == 1) {
+		vec3 light = normalize(vec3(1.0, 1.0, 1.0));
+		acc_n = normalize(acc_n);
+		acc_color *= 0.5 * dot(acc_n, light) + 0.5;
+	}
+	
+	out_color = vec4(mix(bgcolor, acc_color, min(1.0, acc_opacity)), 1.0);
+}
+
+</script>
+<script type="text/javascript">
+'use strict';
+
+function assert (condition, message = "Assertion failed") {
+	if (!condition) {
+		throw new Error(message);
+	}
+	return condition;
+}
+
+class Vec {
+
+	static _checkLength (v1, v2) {
+		assert(v1.length == v2.length, "Vectors should have the same length");
+	}
+
+	static zero (length) {
+		let r = new Array(length);
+		for (let i = 0; i < length; ++i) {
+			r[i] = 0;
+		}
+		return r;
+	}
+	
+	static add (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] + v2[i];
+		}
+		return v;
+	}
+
+	static sub (v1, v2) {
+		Vec._checkLength(v1, v2);
+		let v = new Array(v1.length);
+		for (let i = 0; i < v1.length; ++i) {
+			v[i] = v1[i] - v2[i];
+		}
+		return v;
+	}
+
+}
+
+class Mat {
+
+	static empty (rows, columns) {
+		let m = new Array(rows);
+		for (let i = 0; i < rows; ++i) {
+			m[i] = new Array(columns);
+		}
+		return m;
+	}
+
+	static zero (rows, columns) {
+		let m = Mat.empty(rows, columns);
+		for (let i = 0; i < rows; ++i) {	
+			for (let j = 0; j < columns; ++j) {
+				m[i][j] = 0;
+			}
+		}
+		return m;
+	}
+
+	static scalar (size, value) {
+		let m = Mat.zero(size, size);
+		for (let i = 0; i < size; ++i) {
+			m[i][i] = value;
+		}
+		return m;
+	}
+
+	static identity (size) {
+		return Mat.scalar(size, 1);
+	}
+
+	static transpose (m) {
+		let r = Mat.empty(m[0].length, m.length);
+		for (let i = 0; i < m.length; ++i) {	
+			for (let j = 0; j < m[0].length; ++j) {
+				r[j][i] = m[i][j];
+			}
+		}
+		return r;
+	}
+
+	static ortho (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = 1 / right;
+		m[1][1] = 1 / top;
+		m[2][2] = - 2 / (far - near);
+		m[2][3] = - (far + near) / (far - near);
+		m[3][3] = 1;
+		return m;
+	}
+
+	static frustum (near, far, right, top) {
+		let m = Mat.zero(4, 4);
+		m[0][0] = near / right;
+		m[1][1] = near / top;
+		m[2][2] = - (far + near) / (far - near);
+		m[2][3] = - 2 * far * near / (far - near);
+		m[3][2] = -1;
+		return m;
+	}
+
+	static add (m1, m2) {
+		assert(m1.length == m2.length && m1[0].length == m2[0].length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+
+		let r = Mat.empty(size1, size2);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				r[i][j] = m1[i][j] + m2[i][j];
+			}
+		}
+
+		return r;
+	}
+
+	static mult (m1, m2) {
+		assert(m1[0].length == m2.length, "Matrices sizes do not match");
+		let size1 = m1.length;
+		let size2 = m1[0].length;
+		let size3 = m2[0].length;
+
+		let r = Mat.zero(size1, size3);
+		for (let i = 0; i < size1; ++i) {
+			for (let j = 0; j < size2; ++j) {
+				for (let k = 0; k < size3; ++k) {
+					r[i][k] += m1[i][j] * m2[j][k];
+				}
+			}
+		}
+
+		return r;
+	}
+
+	static rotationXY (a) {
+		let r = Mat.identity(4);
+		r[0][0] = Math.cos(a);
+		r[0][1] = -Math.sin(a);
+		r[1][0] = Math.sin(a);
+		r[1][1] = Math.cos(a);
+		return r;
+	}
+
+	static rotationYZ (a) {
+		let r = Mat.identity(4);
+		r[1][1] = Math.cos(a);
+		r[1][2] = -Math.sin(a);
+		r[2][1] = Math.sin(a);
+		r[2][2] = Math.cos(a);
+		return r;
+	}
+
+	static rotationZX (a) {
+		let r = Mat.identity(4);
+		r[2][2] = Math.cos(a);
+		r[2][0] = -Math.sin(a);
+		r[0][2] = Math.sin(a);
+		r[0][0] = Math.cos(a);
+		return r;
+	}
+
+	static rotationGeneratorXY () {
+		let r = Mat.zero(4, 4);
+		r[0][0] = 0;
+		r[0][1] = -1;
+		r[1][0] = 1;
+		r[1][1] = 0;
+		return r;
+	}
+
+	static rotationGeneratorYZ () {
+		let r = Mat.zero(4, 4);
+		r[1][1] = 0;
+		r[1][2] = -1;
+		r[2][1] = 1;
+		r[2][2] = 0;
+		return r;
+	}
+
+	static rotationGeneratorZX (a) {
+		let r = Mat.zero(4, 4);
+		r[2][2] = 0;
+		r[2][0] = -1;
+		r[0][2] = 1;
+		r[0][0] = 0;
+		return r;
+	}
+
+	static translation (v) {
+		let r = Mat.identity(4);
+		r[0][3] = v[0];
+		r[1][3] = v[1];
+		r[2][3] = v[2];
+		return r;
+	}
+
+	static exp (m) {
+		let r = Mat.identity(m.length);
+		let mm = m;
+		for (let i = 1; i < 10; ++i) {
+			mm = Mat.mult(mm, Mat.scalar(m.length, 1/i));
+			r = Mat.add(r, mm);
+			mm = Mat.mult(mm, m);
+		}
+		return r;
+	}
+}
+
+class SphericalCamera {
+
+	constructor () {
+		this.rotationMatrix = Mat.identity(4);
+		this.distance = 5;
+	}
+
+	rotateXY (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationXY(a), this.rotationMatrix);
+	}
+
+	rotateYZ (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationYZ(a), this.rotationMatrix);
+	}
+
+	rotateZX (a) {
+		this.rotationMatrix = Mat.mult(Mat.rotationZX(a), this.rotationMatrix);
+	}
+
+	matrix () {
+		return Mat.mult(Mat.translation([0, 0, -this.distance]), this.rotationMatrix);
+	}
+}
+
+class Frame {
+	constructor (canvas, pixelSize = 1) {
+		this.canvas = canvas;
+		this.setupEvents(canvas);
+		this.mouseDown = false;
+		this.mouse = [0, 0];
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+		this.gl = canvas.getContext("webgl2");
+		this.gl.uniformMatrix = (location, transpose, matrix) => {
+			let rows = matrix.length;
+			let columns = matrix[0].length;
+			let flat = new Float32Array(rows * columns);
+			for (let i = 0; i < rows; ++i) {	
+				for (let j = 0; j < columns; ++j) {
+					flat[j * rows + i] = matrix[i][j];
+				}
+			}
+			let functionName = 'uniformMatrix' + (rows == columns ? rows : rows + 'x' + columns) + 'fv';
+			this.gl[functionName](location, transpose, flat);
+		};
+		this.extensions = new Map();
+		this.pixelSize = pixelSize;
+		this.onResize();
+	}
+
+	setupEvents (canvas) {
+		canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
+		canvas.onmouseout = (event) => { this.onMouseOut(event); };
+		canvas.ontouchstart = (event) => { this.onMouseDown(event); }
+		canvas.ontouchmove = (event) => { this.onMouseMove(event); }
+		canvas.ontouchend = (event) => { this.onMouseUp(event); }
+		canvas.ontouchcancel = (event) => { this.onMouseUp(event); }
+	}
+
+	getExtension (name) {
+		let ext;
+		if (!name in this.extensions) {
+			ext = this.gl.getExtension(name);
+			this.extensions[name] = ext;
+		} else {
+			ext = this.extensions[name];
+		}
+		return ext;
+	}
+
+	onResize () {
+		this.canvas.width  = this.canvas.clientWidth / this.pixelSize;
+		this.canvas.height = this.canvas.clientHeight / this.pixelSize;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown (event) {
+		this.mouseDown = true;
+
+		if (event.type == 'mousedown') {
+			this.mouse = [event.clientX, event.clientY];
+		}
+		if (event.type == 'touchstart') {
+			this.mouse = [event.touches[0].clientX, event.touches[0].clientY];
+		}
+	}
+
+	onMouseUp (event) {
+		this.mouseDown = false;
+
+		if (event.type == 'mouseup') {
+			this.mouse = [event.clientX, event.clientY];
+		}
+		if (event.type == 'touchend' || event.type == 'touchcanceled') {
+			this.mouse = [event.touches[0].clientX, event.touches[0].clientY];
+		}
+	}
+
+	onMouseMove (event) {
+		let newMouse = [];
+		if (event.type == 'mousemove') {
+			newMouse = [event.clientX, event.clientY];
+		}
+		if (event.type == 'touchmove') {
+			newMouse = [event.touches[0].clientX, event.touches[0].clientY];
+		}
+
+		this.mouseRelative = Vec.add(this.mouseRelative, Vec.sub(newMouse, this.mouse));
+		this.mouse = newMouse;
+	}
+
+	onMouseWheel (event) {
+		this.wheelRelative += event.wheelDelta / 120;
+	}
+
+	onMouseOut (event) {
+		this.mouseDown = false;
+	}
+
+	draw () {
+		let gl = this.gl;
+
+		this.processInput();
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+
+	processInputs () {
+		this.mouseRelative = [0, 0];
+		this.wheelRelative = 0;
+	}
+
+	createTexture (width, height) {
+		let gl = this.gl;
+
+		let texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		return texture;
+	}
+
+	createBuffer (vertices) {
+		let gl = this.gl;
+
+		let buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		return buffer;
+	}
+
+	loadShader(name, type, subst = null) {
+		let gl = this.gl;
+
+		let script = assert(document.getElementById(name), "Shader " + name + " not found");
+
+		let source = script.textContent;
+
+		if (subst != null) {
+			for (const [key, value] of Object.entries(subst)) {
+				source = source.replace(key, value);
+			}
+		}
+		
+		let shader = gl.createShader(type);
+		gl.shaderSource(shader, source);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			throw new Error("Shader " + name + ": " + gl.getShaderInfoLog(shader));
+		}
+
+		return shader;
+	}
+
+	loadProgram(name, subst = null) {
+		let gl = this.gl;
+
+		let program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER, subst));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER, subst));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			throw new Error("Program " + name + ": " + gl.getProgramInfoLog(program));
+		}
+
+		let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+		for (let u = 0; u < uniformCount; ++u) {
+			let uniformInfo = gl.getActiveUniform(program, u);
+			let name = uniformInfo.name;
+			let location = gl.getUniformLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location
+					};
+				},
+				set: (value) => {
+					if (uniformInfo.type == gl.FLOAT_MAT4) {
+						gl.uniformMatrix(location, false, value);
+					}
+					if (uniformInfo.type == gl.FLOAT) {
+						gl.uniform1f(location, value);
+					}
+					if (uniformInfo.type == gl.FLOAT_VEC3) {
+						gl.uniform3f(location, value[0], value[1], value[2]);
+					}
+					if (uniformInfo.type == gl.INT) {
+						gl.uniform1i(location, value);
+					}
+				}
+			});
+		}
+
+		let attributeCount = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+		for (let a = 0; a < attributeCount; ++a) {
+			let attributeInfo = gl.getActiveAttrib(program, a);
+			let name = attributeInfo.name;
+			let location = gl.getAttribLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location,
+						enable: () => {
+							gl.enableVertexAttribArray(location);
+						}
+					};
+				},
+				set: (value) => { 
+					if (attributeInfo.type == gl.FLOAT_VEC2) {
+						gl.vertexAttribPointer(location, 2, gl.FLOAT, value[0], value[1], value[2]);
+					}
+					if (attributeInfo.type == gl.FLOAT_VEC3) {
+						gl.vertexAttribPointer(location, 3, gl.FLOAT, value[0], value[1], value[2]);
+					}
+				}
+			});
+		}
+
+		return program;
+	}
+}
+
+let wavefunctions = [
+	"H_1s",
+	"H_2s",
+	"H_2p",
+	"H_3s",
+	"H_3p",
+	"Test"
+];
+
+let wavefunction_data = {};
+
+function hgto1d (p, a, s, n)
+{
+	let x = (p-a)/s;
+	let v = Math.exp(-x*x);
+
+	if (n == 1) v *= 2 * x;
+	return v;
+}
+
+function hgto (p, a, s, n)
+{
+	return hgto1d(p[0], a[0], s, n[0]) * hgto1d(p[1], a[1], s, n[1]) * hgto1d(p[2], a[2], s, n[2]);
+}
+
+function randn() {
+    let u = 0, v;
+    while(u == 0) u = Math.random();
+    v = Math.random();
+
+    return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+}
+
+class GTOFrame extends Frame {
+	constructor (canvas, units_canvas) {
+		super(canvas, 1);
+		this.setupEvents(units_canvas);
+
+		let gl = this.gl;
+
+		this.program = this.loadProgram('render');
+		this.quad = this.createQuad(this.program);
+
+		this.camera = new SphericalCamera();
+		this.cameraDistance = this.camera.distance;
+
+		this.units_canvas = units_canvas;
+		this.ctx2d = units_canvas.getContext('2d');
+
+		this.amplification = 1.0;
+		this.axes_shown = true;
+		this.render_target = 0;
+		this.render_mode = 0;
+		this.isosurface = 0.5;
+
+		this.draw_interval = 40;
+		this.last_frame_time = null;
+		this.max_steps = 20;
+		this.max_steps_tgt = this.max_steps;
+		this.avg_frame_time = this.draw_interval;
+		this.need_redraw = true;
+
+		this.onProgress = null;
+
+		this.wavefunction = null;
+
+		this.createTexture();
+	}
+
+	createTexture() {
+
+		this.texture_ready = false;
+		this.texture_data = {};
+		this.texture_data_work = [];
+
+		this.box = 1.0;
+		this.texture_size = 64;
+		this.texture_work_z = 0;
+
+		let gl = this.gl;
+		
+		gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+		this.texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_3D, this.texture);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+		gl.texImage3D(gl.TEXTURE_3D, 0, gl.R16F, this.texture_size, this.texture_size, this.texture_size, 0, gl.RED, gl.FLOAT, null);
+		gl.bindTexture(gl.TEXTURE_3D, null);
+	}
+
+	buildTexture() {
+		if (this.wavefunction == null) return;
+
+		let gl = this.gl;
+
+		// gl.bindTexture(gl.TEXTURE_3D, this.texture);
+		// gl.texImage3D(gl.TEXTURE_3D, 0, gl.R16F, this.texture_size, this.texture_size, this.texture_size, 0, gl.RED, gl.FLOAT, null);
+		// gl.bindTexture(gl.TEXTURE_3D, null);
+
+		this.texture_ready = true;
+
+		if (this.texture_work_z == 0) {
+
+			gl.bindTexture(gl.TEXTURE_3D, this.texture);
+			gl.texImage3D(gl.TEXTURE_3D, 0, gl.R16F, this.texture_size, this.texture_size, this.texture_size, 0, gl.RED, gl.FLOAT, null);
+			gl.bindTexture(gl.TEXTURE_3D, null);
+
+			this.total_density = 0;
+
+			if (this.wavefunction.hasOwnProperty('box')) {
+				this.next_box = this.wavefunction.box;
+				console.log("Using box value: " + this.next_box);
+			}
+			else {
+				this.next_box = 0;
+
+				let thresh = 5e-6;
+
+				for (let samples = 0; samples < 100; ++samples) {
+					let dx = randn();
+					let dy = randn();
+					let dz = randn();
+
+					let r = dx*dx+dy*dy+dz*dz;
+					r = Math.sqrt(r);
+					dx /= r;
+					dy /= r;
+					dz /= r;
+
+					let i = 1;
+					while (true) {
+						let px = dx * i;
+						let py = dy * i;
+						let pz = dz * i;
+
+						if (Math.abs(this.func(px, py, pz)) < thresh) break;
+
+						++i;
+					}
+					
+					if (this.next_box < i) this.next_box = i;
+				}
+
+				console.log("Guessed box size: " + this.next_box);
+			}
+			this.box = this.next_box;
+		}
+
+		let size = this.texture_size;
+		let box = this.next_box;
+		for (let iter = 0; iter < 1; ++iter) {
+			let z = this.texture_work_z;
+
+			for (let y = 0; y < size; ++y) {
+				for (let x = 0; x < size; ++x) {
+					let px = (((x+0.5) / size) * 2.0 - 1.0) * box;
+					let py = (((y+0.5) / size) * 2.0 - 1.0) * box;
+					let pz = (((z+0.5) / size) * 2.0 - 1.0) * box;
+
+					let v = this.func(px, py, pz);
+
+					this.texture_data_work.push(v);	
+
+					this.total_density += v*v;
+				}
+			}
+
+			this.texture_data[z] = new Float32Array(this.texture_data_work);
+			this.texture_data_work = [];
+		
+			++this.texture_work_z;
+
+			if (this.onProgress != null) {
+				this.onProgress(this.texture_work_z / size);
+			}
+		}
+
+		this.need_redraw = true;
+
+		if (this.texture_work_z == size) {
+			// this.texture_data = new Float32Array(this.texture_data_work);
+			// this.texture_work_z = 0;
+			// this.texture_data_work = [];
+			// this.box = this.next_box;
+
+			console.log("Total density: " + this.total_density * Math.pow(2 * box / size, 3));
+		}
+		else {
+			setTimeout(() => { this.buildTexture(); }, 0);
+		}
+	}
+
+	func (x, y, z) {
+		let p = [x, y, z];
+
+		//console.log(this.wavefunction);
+
+		let a = this.wavefunction.origin;
+		let s = this.wavefunction.sigma;
+		let n = this.wavefunction.degree;
+		let c = this.wavefunction.coeff;
+
+		let v = 0;
+		for (let i = 0; i < a.length; ++i)
+			v += hgto(p, a[i], s[i], n[i]) * c[i];
+
+		return v;
+	}
+
+	start () {
+		setTimeout(() => {
+			this.processInputs();
+			this.draw();
+			this.start();
+		}, frame.draw_interval);
+	}
+
+	set_quality (value) {
+		this.texture_size = value;
+		this.texture_work_z = 0;
+		this.texture_data_work = [];
+		this.buildTexture();
+		this.need_redraw = true;
+	}
+
+	set_wavefunction (key) {
+		this.wavefunction = wavefunction_data[key];
+		this.texture_work_z = 0;
+		this.texture_data_work = [];
+		this.buildTexture();
+		this.need_redraw = true;
+	}
+
+	createAxes (program) {
+		let gl = this.gl;
+
+		let vertexBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+		let colorBuffer = this.createBuffer([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+				program.color_in.enable();
+				program.color_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.LINES, 0, 6);
+			}
+		}
+	}
+
+	createCube (program) {
+		let gl = this.gl;
+
+		let vertices = [];
+
+		let helper = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+
+		for (let i = 0; i < 4; ++i) {
+			let x = helper[i][0];
+			let y = helper[i][1];
+
+			vertices.push(x, y, -1);
+			vertices.push(x, y, 1);
+			vertices.push(x, -1, y);
+			vertices.push(x, 1, y);
+			vertices.push(-1, x, y);
+			vertices.push(1, x, y);
+		}
+
+		let vertexBuffer = this.createBuffer(vertices);
+		let colorBuffer = this.createBuffer(new Array(vertices.length).fill(1));
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+				program.color_in.enable();
+				program.color_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.LINES, 0, 24);
+			}
+		}
+	}
+
+	createQuad (program) {
+		let gl = this.gl;
+
+		let vertexBuffer = this.createBuffer([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
+
+		return {
+			draw: () => {
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+				program.vertex_in.enable();
+				program.vertex_in = [false, 0, 0];
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+			}
+		}
+	}
+
+	processInputs () {
+		if (this.mouseDown) {
+			// this.camera.rotateZX(this.mouseRelative[0] / 100.0);
+			// this.camera.rotateYZ(this.mouseRelative[1] / 100.0);
+
+			let generator = Mat.zero(4, 4);
+			let generatorX;
+			let generatorY;
+
+			let width = this.canvas.clientWidth / 2;
+			let height = this.canvas.clientHeight / 2;
+
+			if (this.mouse[0] >= width) {
+				let t = (this.mouse[0] - width) / width;
+				generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - (1 - t))));
+			} else {
+				let t = this.mouse[0] / width;
+				 generatorX = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorYZ(), Mat.scalar(4, - t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorX, Mat.scalar(4, -this.mouseRelative[1] / 100)));
+
+			if (this.mouse[1] >= height) {
+				let t = (this.mouse[1] - height) / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, t)), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, (1 - t))));
+			} else {
+				let t = this.mouse[1] / height;
+				generatorY = Mat.add(Mat.mult(Mat.rotationGeneratorXY(), Mat.scalar(4, - (1 - t))), Mat.mult(Mat.rotationGeneratorZX(), Mat.scalar(4, t)));
+			}
+			generator = Mat.add(generator, Mat.mult(generatorY, Mat.scalar(4, this.mouseRelative[0] / 100)));
+
+			let rotation = Mat.exp(generator);
+			this.camera.rotationMatrix = Mat.mult(rotation, this.camera.rotationMatrix);
+
+			this.need_redraw = true;
+		}
+
+		if (this.wheelRelative != 0.0) {
+			this.cameraDistance *= Math.pow(0.8, this.wheelRelative);
+			this.need_redraw = true;
+		}
+
+		if (Math.abs(this.cameraDistance - this.camera.distance) > 1e-4) {
+			this.camera.distance += (this.cameraDistance - this.camera.distance) * 0.6;
+			this.need_redraw = true;
+		}
+
+		super.processInputs();
+	}
+
+	onResize () {
+		let gl = this.gl;
+		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	draw () {
+		let now = performance.now();
+
+		if (document.hidden || !this.need_redraw) {
+			this.last_frame_time = now;
+			return;
+		}
+
+		this.last_frame_time = now;
+
+		let gl = this.gl;
+
+		gl.clearColor(1.0, 1.0, 1.0, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		gl.bindTexture(gl.TEXTURE_3D, this.texture);
+		// if (this.texture_data != null) {
+		for (let z in this.texture_data) {
+			// console.log("Loading: z=" + z + ", size=" + this.texture_size);
+			gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, z, this.texture_size, this.texture_size, 1, gl.RED, gl.FLOAT, this.texture_data[z]);
+			// this.texture_ready = true;
+		}
+
+		this.texture_data = {};
+
+		if (this.texture_ready || true) {
+			gl.useProgram(this.program);
+			this.program.view = Mat.transpose(this.camera.rotationMatrix);
+			this.program.scale = this.camera.distance;
+			this.program.render_mode = this.render_mode;
+			this.program.amplification = this.amplification;
+			this.program.isosurface = this.isosurface;
+			this.program.max_steps = this.texture_size;
+
+			let L = this.box;
+
+			this.program.bbox0 = [-L, -L, -L];
+			this.program.bbox1 = [ L,  L,  L];
+			this.quad.draw();
+			gl.useProgram(null);
+		}
+
+		gl.bindTexture(gl.TEXTURE_3D, null);
+
+		let angstrom_length = 1.0 / this.camera.distance / 0.52917721;
+		let n = Math.floor(-Math.log10(angstrom_length));
+		let unit_length = Math.pow(10, n) * angstrom_length;
+		let scale_width = this.canvas.width * 0.5 * unit_length;
+
+		let h = 0.95;
+
+		let rot = this.camera.rotationMatrix;
+
+		let d = this.ctx2d;
+		d.clearRect(0, 0, d.canvas.width, d.canvas.height);
+		d.fillStyle = '#000';
+		d.font = '14px Arial';
+
+		let axes_length = d.canvas.width / 20;
+
+		let cx = d.canvas.width / 2;
+		let cy = d.canvas.height / 2;
+
+		if (this.axes_shown) {
+			let colors = ['#f00', '#0f0', '#00f'];
+			let names = ['X', 'Y', 'Z'];
+			
+			let axes = [0, 1, 2];
+			axes.sort(function(i,j){ return rot[2][i] - rot[2][j]; });
+
+			d.textAlign = 'center';
+			d.textBaseline = 'bottom';
+
+			for (const i of axes) {
+				let x = cx + rot[0][i] * axes_length;
+				let y = cy - rot[1][i] * axes_length;
+
+				let rx = cx + rot[0][i] * (axes_length + 1);
+				let ry = cy - rot[1][i] * (axes_length + 1);
+
+				let tx = x + 0.5 * (x - cx);
+				let ty = y + 0.5 * (y - cy);
+
+				d.lineWidth = 7;
+				d.strokeStyle = '#000';
+				d.beginPath();
+				d.moveTo(cx, cy);
+				d.lineTo(rx, ry);
+				d.stroke();
+
+				d.lineWidth = 5;
+				d.strokeStyle = colors[i];
+				d.beginPath();
+				d.moveTo(cx, cy);
+				d.lineTo(x, y);
+				d.stroke();
+
+				d.fillText(names[i], tx, ty + 7);
+			}
+		}
+
+		if (this.texture_work_z < this.texture_size) {
+			let L = this.box;
+			let Z = (2.0 * this.texture_work_z / this.texture_size - 1.0) * L;
+
+			// v0 = [-L, -L, Z]
+			// v1 = [ L, -L, Z]
+			// v2 = [-L, -L, Z]
+			// v3 = [-L, -L, Z]
+
+			let frame = [
+				[-L, -L, Z],
+				[-L,  L, Z],
+				[ L,  L, Z],
+				[ L, -L, Z],
+				[-L, -L, Z],
+			];
+
+			d.strokeStyle = '#000';
+			d.lineWidth = 2;
+			d.beginPath();
+			for (let i = 0; i < frame.length; ++i) {
+				let x = rot[0][0] * frame[i][0] + rot[0][1] * frame[i][1] + rot[0][2] * frame[i][2];
+				let y = rot[1][0] * frame[i][0] + rot[1][1] * frame[i][1] + rot[1][2] * frame[i][2];
+
+				x = x * this.canvas.width * 0.5 / this.camera.distance;
+				y = y * this.canvas.width * 0.5 / this.camera.distance;
+
+				if (i == 0)
+					d.moveTo(cx + x, cy - y);
+				else
+					d.lineTo(cx + x, cy - y);
+			}
+			d.stroke();
+		}
+
+		d.strokeStyle = '#000';
+		d.lineWidth = 2;
+		d.beginPath();
+		d.moveTo(d.canvas.width / 2, d.canvas.height * h);
+		d.lineTo(d.canvas.width / 2 + scale_width, d.canvas.height * h);
+		d.moveTo(d.canvas.width / 2, d.canvas.height * h - 3);
+		d.lineTo(d.canvas.width / 2, d.canvas.height * h + 3);
+		d.moveTo(d.canvas.width / 2 + scale_width, d.canvas.height * h - 3);
+		d.lineTo(d.canvas.width / 2 + scale_width, d.canvas.height * h + 3);
+		d.stroke();
+		d.textAlign = 'center';
+		d.textBaseline = 'bottom';
+		d.fillText(Math.pow(10, n) + String.fromCharCode(8491), d.canvas.width / 2 + scale_width, d.canvas.height * h - 7);
+		d.textBaseline = 'top';
+		d.fillText(Math.pow(10, n-1) + 'nm', d.canvas.width / 2 + scale_width, d.canvas.height * h + 8);
+
+		if (this.wavefunction) {
+			d.textAlign = 'left';
+			d.fillText("Energy: " + this.wavefunction.energy + " Ha", 20, 20);
+		}
+
+		this.need_redraw = false;
+	}
+}
+
+function get_json (url, callback) {
+		let req = new XMLHttpRequest();
+		req.overrideMimeType("application/json");
+ 		req.open('GET', url, true);
+		req.onreadystatechange = function () {
+			if (req.readyState == 4 && req.status == "200") {
+				let data = JSON.parse(req.responseText);
+				callback(data);
+			}
+		};
+		req.send(null);
+}
+
+var frame;
+
+function init () {
+	let canvas = document.getElementById('orbital-canvas');
+	let units_canvas = document.getElementById('units-canvas');
+	let controls_table = document.getElementById('controls-table');
+
+	let wavefunction_select = document.getElementById('wavefunction');
+
+	get_json('orbitals.json', (wavefunctions) => {
+
+		for (const key in wavefunctions) {
+			let w = wavefunctions[key];
+			if (!(w.bound)) continue;
+
+			wavefunction_select.innerHTML += '<option value="' + key + '" id="select-' + key + '">' + w.name + '</option>';
+
+			wavefunction_data[key] = w;
+			if (key == 0) {
+				frame.set_wavefunction(key);
+			}
+		}
+
+		wavefunction_select.innerHTML += '<option disabled>_______________________</option>';
+		wavefunction_select.innerHTML += '<option disabled></option>';
+
+		for (const key in wavefunctions) {
+			let w = wavefunctions[key];
+			if (w.bound) continue;
+
+			wavefunction_select.innerHTML += '<option value="' + key + '" id="select-' + key + '">' + w.name + '</option>';
+
+			wavefunction_data[key] = w;
+			if (key == 0) {
+				frame.set_wavefunction(key);
+			}
+		}
+
+	});
+
+	frame = new GTOFrame(canvas, units_canvas);
+	
+	let progressbar = document.getElementById('progress');
+	frame.onProgress = (val) => {
+		progressbar.value = val * 1000.0;
+	};
+
+	function onResize() {
+		let size;
+		if (window.innerHeight < window.innerWidth) {
+			size = window.innerHeight;
+			controls_table.style.left = size;
+			controls_table.style.width = window.innerWidth - size;
+		} else {
+			size = window.innerWidth;
+			controls_table.style.top = size;
+			controls_table.style.width = size;
+		}
+
+		canvas.width = size;
+		canvas.height = size;
+		units_canvas.width = size;
+		units_canvas.height = size;
+
+		frame.onResize();
+		frame.draw();
+	};
+
+	window.addEventListener('resize', onResize);
+	onResize();
+
+	var redraw = function(time){
+		frame.processInputs();
+		frame.draw();
+		setTimeout(() => window.requestAnimationFrame(redraw), frame.draw_interval);
+	};
+	redraw();
+}
+
+function amplificationChanged () {
+	let amp = document.getElementById('amplification').value;
+	
+	amp = Math.pow(10.0, amp / 100.0);
+
+	document.getElementById('amplification-label').innerHTML = amp.toFixed(3);
+
+	frame.amplification = amp;
+	frame.need_redraw = true;
+}
+
+function axesShownChanged () {
+	frame.axes_shown = document.getElementById('axes-shown').checked;
+	frame.need_redraw = true;
+}
+
+function renderModeChanged () {
+	frame.render_mode = parseInt(document.getElementById('render-mode').value);
+	frame.need_redraw = true;
+
+	document.getElementById('amplification-row').style.display = (frame.render_mode == 0) ? '' : 'none';
+	document.getElementById('isosurface-row').style.display = (frame.render_mode == 1) ? '' : 'none';
+}
+
+function isosurfaceChanged () {
+	let value = document.getElementById('isosurface').value;
+	
+	value = value / 1000.0;
+	value = value * value / 10.0;
+
+	document.getElementById('isosurface-label').innerHTML = value.toFixed(5);
+
+	frame.isosurface = value;
+	frame.need_redraw = true;
+}
+
+function wavefunctionChanged () {
+	frame.set_wavefunction(document.getElementById('wavefunction').value);
+}
+
+function qualityChanged() {
+	frame.set_quality(document.getElementById('quality').value);
+}
+</script>
+<style type="text/css">
+body {
+    overflow: hidden;
+}
+* {
+	padding: 0;
+	margin: 0;
+}
+#orbital-canvas {
+	position: absolute;
+	left: 0%;
+	top: 0%;
+	z-index: 0;
+	display: block;
+}
+#units-canvas {
+	background-color: transparent;
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: 10;
+	display: block;
+}
+#controls-table {
+	position: absolute;
+}
+table, tr, td {
+	border: 2px solid transparent;
+}
+</style>
+</head>
+<body onload="init(); isosurfaceChanged(); amplificationChanged(); renderModeChanged();">
+
+<div>
+<canvas id='orbital-canvas'></canvas>
+<canvas id='units-canvas'></canvas>
+</div>
+
+<div id='controls-table'>
+<table>
+<tr>
+<td width="150px">
+Wavefunction:
+</td>
+<td width="100px" colspan="2">
+<select id="wavefunction" oninput="wavefunctionChanged();" style="width:100%">
+</select>
+</td>
+</tr>
+<tr>
+<td>
+Quality:
+</td>
+<td colspan="2">
+<select id="quality" style="width:100%" oninput="qualityChanged();">
+<option>16</option>
+<option>24</option>
+<option>32</option>
+<option>48</option>
+<option selected="selected">64</option>
+<option>96</option>
+<option>128</option>
+<option>192</option>
+<option>256</option>
+</select>
+</td>
+</tr>
+<tr>
+<td>
+Loading progress:
+</td>
+<td colspan="2">
+<progress id="progress" value="0" max="1000" style="width:100%"></progress>
+</td>
+</tr>
+<tr>
+<td>
+Render mode:
+</td>
+<td colspan="2">
+<select id="render-mode" oninput="renderModeChanged();" style="width:100%">
+<option value="0">Volume</option>
+<option value="1">Isosurface</option>
+</select>
+</td>
+</tr>
+<tr id="amplification-row">
+<td width="150px">
+Intensity:
+</td>
+<td width="100px">
+<div id='amplification-label'>1.00</div>
+</td>
+<td width="300px">
+<input type="range" min="-100" max="300" value="100" class="slider" id="amplification" oninput="amplificationChanged();" style="width:100%">
+</td>
+</tr>
+<tr id="isosurface-row">
+<td width="150px">
+Isosurface:
+</td>
+<td width="100px">
+<div id='isosurface-label'>0.1</div>
+</td>
+<td width="300px">
+<input type="range" min="100" max="2000" value="300" class="slider" id="isosurface" oninput="isosurfaceChanged();" style="width:100%">
+</td>
+</tr>
+<tr>
+<td>
+Axes:
+</td>
+<td colspan="2">
+<input type="checkbox" id="axes-shown" name="axes-shown" checked='true' oninput="axesShownChanged();">
+<label for="axes-shown">Shown</label>
+</td>
+</tr>
+<tr style="text-align:justify">
+<td colspan="3">
+<br/>
+This page renders one-electron orbitals (ignoring electron repulsion!) of various tiny quantum systems via volumetric raymarching through function field baked into a 3D-texture, either as a density cloud or as an isosurface.
+<span style="color:red">Red</span> shows where the wavefunction is positive, while <span style="color:blue">blue</span> shows negative areas. Energy is given in <a href="https://en.wikipedia.org/wiki/Hartree">Hartree units</a> and includes electron kinetic & potential terms as well as nuclei repulsion energy.
+<br/>
+<br/>
+Some of the presented wavefunctions (namely, those after a separating line) are non-bonding: they are energy eigenstates of a system with fixed nuclei, but such one-electron configurations are unstable and would tear apart if the nuclei are allowed to move, since removing some of the nuclei would lower the energy. As such, they have little to zero physical significance on their own, and the corresponding ions/molecules certainly don't look like that. However, they form a good basis for understanding the behavior of many-electron systems. They look nice, though, so I decided to include them.
+<br/>
+<br/>
+Click & drag to rotate. If nothing is shown, try tweaking intensity/isosurface sliders.
+<br/>
+NB: Low values of quality option may lead to noticeable artifacts, while high values may slow everything down.
+<br/>
+<br/>
+&copy; Lisitsa Nikita, 2020
+<br/>
+<br/>
+<a href="https://twitter.com/lisyarus?ref_src=twsrc%5Etfw" class="twitter-follow-button" data-show-count="false">Follow me</a><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+</td>
+</tr>
+</table>
+</div>
+
+</body>
+</html>
