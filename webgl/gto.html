@@ -674,6 +674,8 @@ class GTOFrame extends Frame {
 
 		this.camera = new SphericalCamera();
 		this.cameraDistance = this.camera.distance;
+		this.camera.rotateZX(- Math.PI / 4.0);
+		this.camera.rotateYZ(Math.PI / 4.0);
 
 		this.units_canvas = units_canvas;
 		this.ctx2d = units_canvas.getContext('2d');
