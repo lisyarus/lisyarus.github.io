@@ -70,9 +70,12 @@ void main(){
 class Frame {
 	constructor (canvas, pixelSize = 1) {
 		this.canvas = canvas;
-		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
-		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
-		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.canvas.addEventListener('mousedown', (event) => { this.onMouseDown(event); });
+		this.canvas.addEventListener('mouseup', (event) => { this.onMouseUp(event); });
+		this.canvas.addEventListener('mousemove', (event) => { this.onMouseMove(event); });
+		this.canvas.addEventListener('touchstart', (event) => { this.onTouchStart(event); });
+		this.canvas.addEventListener('touchmove', (event) => { this.onTouchMove(event); });
+		this.canvas.addEventListener('touchend', (event) => { this.onTouchEnd(event); });
 		this.mouseDown = false;
 		this.mouse = [0, 0];
 		try {
@@ -117,6 +120,26 @@ class Frame {
 
 	onMouseMove (event) {
 		this.mouse = [event.clientX, event.clientY];
+	}
+
+	toMouseEvent (event) {
+		let p = event.changedTouches[0];
+		return {'clientX': p.clientX, 'clientY': p.clientY}
+	}
+
+	onTouchStart (event) {
+		event.preventDefault();
+		this.onMouseDown(this.toMouseEvent(event));
+	}
+
+	onTouchMove (event) {
+		event.preventDefault();
+		this.onMouseMove(this.toMouseEvent(event));
+	}
+
+	onTouchEnd (event) {
+		event.preventDefault();
+		this.onMouseUp(this.toMouseEvent(event));
 	}
 
 	draw () {
