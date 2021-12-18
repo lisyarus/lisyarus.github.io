@@ -1,0 +1,508 @@
+<html>
+<head>
+<script id="cross-render-vs" type="text/glsl">
+precision mediump float;
+
+uniform vec2 scale;
+uniform vec2 translate;
+
+attribute vec2 vertex;
+
+void main(){
+	gl_Position = vec4(vertex * scale + translate, 0.0, 1.0);
+}
+
+</script>
+<script id="cross-render-fs" type="text/glsl">
+precision mediump float;
+
+uniform vec4 color;
+
+void main(){
+	gl_FragColor = color;
+}
+
+</script>
+<script id="field-render-vs" type="text/glsl">
+precision mediump float;
+
+uniform vec2 scale;
+uniform vec2 translate;
+
+attribute vec2 vertex;
+
+varying vec2 position;
+
+void main(){
+	position = vertex * scale + translate;
+	gl_Position = vec4(vertex, 0.0, 1.0);
+}
+
+</script>
+<script id="field-render-fs" type="text/glsl">
+precision highp float;
+
+// thetaXY
+THETA_UNIFORMS
+
+varying vec2 position;
+
+float value(vec2 p) {
+	return FORMULA;
+}
+
+void main(){
+	float v = value(position);
+
+	vec4 color = vec4(1.0);
+	if (v > 0.0)
+		color = mix(color, vec4(1.0, 0.0, 0.0, 1.0), 2.0 / (1.0 + exp(-v)) - 1.0);
+	else
+		color = mix(color, vec4(0.0, 0.0, 1.0, 1.0), 2.0 / (1.0 + exp( v)) - 1.0);
+
+	gl_FragColor = mix(color, vec4(1.0), 0.75);
+}
+
+</script>
+<script type="text/javascript">
+'use strict';
+
+class Frame {
+	constructor (canvas, pixelSize = 1) {
+		this.canvas = canvas;
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.mouseDown = false;
+		this.mouse = [0, 0];
+		try {
+			this.gl = canvas.getContext("experimental-webgl");
+		} catch (e) {
+			alert('Failed to load WebGL:', e);
+		}
+		this.extensions = new Map();
+		this.pixelSize = pixelSize;
+		this.onResize();
+	}
+
+	loadExt (name) {
+		var ext;
+		try {
+			ext = this.gl.getExtension(name);
+		} catch (e) {
+			alert('Failed to load WebGL extension', name, ':', e);
+		}
+		this.extensions[name] = ext;
+		return ext;
+	}
+
+	onResize () {
+		this.canvas.width  = this.canvas.clientWidth / this.pixelSize;
+		this.canvas.height = this.canvas.clientHeight / this.pixelSize;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown (event) {
+		if (event.button == 0)
+			this.mouseDown = true;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseUp (event) {
+		if (event.button == 0)
+			this.mouseDown = false;
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	onMouseMove (event) {
+		this.mouse = [event.clientX, event.clientY];
+	}
+
+	draw () {
+		var gl = this.gl;
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+}
+
+class ClassificationFrame extends Frame {
+
+	constructor (canvas) {
+		super(canvas, 1);
+
+		var gl = this.gl;
+
+		gl.lineWidth(3.0);
+
+		this.crossProgram = this.loadProgram('cross-render');
+		gl.useProgram(this.crossProgram);
+		this.crossProgramScaleLocation = gl.getUniformLocation(this.crossProgram, "scale");
+		this.crossProgramTranslateLocation = gl.getUniformLocation(this.crossProgram, "translate");
+		this.crossProgramColorLocation = gl.getUniformLocation(this.crossProgram, "color");
+		this.crossProgramVertexLocation = gl.getAttribLocation(this.crossProgram, "vertex");
+
+		this.pointBuffer = [];
+		this.pointBuffer.push(this.createBuffer([-1, -1, 1, 1, -1, 1, 1, -1]));
+
+		var circlePoints = [];
+		for (let i = 0; i < 36; ++i) {
+			let a = 2.0 * Math.PI * i / 36.0;
+			circlePoints.push(Math.cos(a));
+			circlePoints.push(Math.sin(a));
+		}
+		this.pointBuffer.push(this.createBuffer(circlePoints));
+
+		this.theta = [0.0, 0.0, -1.0];
+		this.updateOrder(1);
+
+		this.fieldBuffer = this.createBuffer([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]);
+
+		this.points = [[[-0.5, 0.0]], [[0.5, 0.0]]];
+		this.mode = 0;
+
+		this.selection = null;
+		this.drag = null;
+	}
+
+	createBuffer (vertices) {
+		var gl = this.gl;
+
+		var buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		return buffer;
+	}
+
+	loadShader(name, type, substitution = null) {
+		var gl = this.gl;
+
+		var script = document.getElementById(name);
+		if (!script)
+			return null;
+
+		var source = script.textContent;
+		if (substitution) {
+			for (let key in substitution) {
+				source = source.replace(key, substitution[key]);
+			}
+		}
+		
+		var shader = gl.createShader(type);
+		gl.shaderSource(shader, source);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			alert(name + ": " + gl.getShaderInfoLog(shader));
+			return null;
+		}
+
+		return shader;
+	}
+
+	loadProgram(name, substitution = null) {
+		var gl = this.gl;
+
+		var program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER, substitution));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER, substitution));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			alert(gl.getProgramInfoLog(program));
+			return null;
+		}
+
+		return program;
+	}
+
+	screenToWorld (p) {
+		let aspectRatio = this.canvas.width / this.canvas.height;
+
+		return [(p[0] / this.canvas.width * 2.0 - 1.0) * aspectRatio, 1.0 - p[1] / this.canvas.height * 2.0];
+	}
+
+	onMouseDown (event) {
+		super.onMouseDown(event);
+
+		let m = this.screenToWorld(this.mouse);
+
+		if (this.selection) {
+			let p = this.points[this.selection[0]][this.selection[1]];
+			this.drag = [p[0] - m[0], p[1] - m[1]];
+		}
+		else {
+			this.points[this.mode].push(m);
+		}
+	}
+
+	onMouseUp (event) {
+		super.onMouseUp(event);
+		this.drag = null;
+	}
+
+	onMouseMove (event) {
+		super.onMouseMove(event);
+		let m = this.screenToWorld(this.mouse);
+		if (this.drag) {
+			var p = this.points[this.selection[0]][this.selection[1]];
+			p[0] = m[0] + this.drag[0];
+			p[1] = m[1] + this.drag[1];
+		}
+		else {
+			this.updateSelection();
+		}
+	}
+
+	distance (p1, p2) {
+		return Math.sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]));
+	}
+
+	updateSelection () {
+		let m = this.screenToWorld(this.mouse);
+
+		this.selection = null;
+
+		let closestDistance = 0.05;
+
+		for (let j = 0; j < 2; j++) {
+			for (let i = 0; i < this.points[j].length; i++) {
+				let d = this.distance(this.points[j][i], m);
+
+				if (d < closestDistance) {
+					closestDistance = d;
+					this.selection = [j, i];
+				}
+			}
+		}
+	}
+
+	draw () {
+		var gl = this.gl;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		let aspectRatio = this.canvas.width / this.canvas.height;
+
+		gl.clearColor(1.0, 1.0, 1.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.useProgram(this.fieldProgram);
+		gl.uniform2f(this.fieldProgramScaleLocation, aspectRatio, 1.0);
+		gl.uniform2f(this.fieldProgramTranslateLocation, 0.0, 0.0);
+
+		for (let i = 0; i < this.theta.length; ++i) {
+			gl.uniform1f(this.fieldProgramThetaLocation[i], this.theta[i]);
+		}
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.fieldBuffer);
+		gl.enableVertexAttribArray(this.fieldProgramVertexLocation);
+		gl.vertexAttribPointer(this.fieldProgramVertexLocation, 2, gl.FLOAT, false, 0, 0);
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+		gl.useProgram(this.crossProgram);
+
+		for (let j = 0; j < 2; ++j) {
+			if (j == 0)
+				gl.uniform4f(this.crossProgramColorLocation, 1.0, 0.0, 0.0, 1.0);
+			else
+				gl.uniform4f(this.crossProgramColorLocation, 0.0, 0.0, 1.0, 1.0);
+
+
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.pointBuffer[j]);
+			gl.enableVertexAttribArray(this.crossProgramVertexLocation);
+			gl.vertexAttribPointer(this.crossProgramVertexLocation, 2, gl.FLOAT, false, 0, 0);
+
+			for (let i = 0; i < this.points[j].length; i++) {
+				var crossSize = 0.02;
+				if (this.selection && this.selection[0] == j && this.selection[1] == i)
+					crossSize = 0.025;
+				let p = this.points[j][i];
+				gl.uniform2f(this.crossProgramScaleLocation, crossSize / aspectRatio, crossSize);
+				gl.uniform2f(this.crossProgramTranslateLocation, p[0] / aspectRatio, p[1]);
+
+				if (j == 0)
+					gl.drawArrays(gl.LINES, 0, 4);
+				else
+					gl.drawArrays(gl.LINE_LOOP, 0, 36);
+			}
+		}
+	}
+
+	h(p) {
+		var value = 0.0;
+		var id = 0;
+		for (let x = 0; x <= this.order; ++x) {
+			for (let y = 0; y <= this.order - x; ++y) {
+				var d = 1.0;
+				for (let ix = 0; ix < x; ++ix) d *= p[0];
+				for (let iy = 0; iy < y; ++iy) d *= p[1];
+
+				value += d * this.theta[id];
+
+				++id;
+			}
+		}
+		return value;
+	}
+
+	g(p) {
+		return 1.0 / (1.0 + Math.exp(-this.h(p)));
+	}
+
+	step (dt) {
+		var gl = this.gl;
+
+		let m = this.points[0].length + this.points[1].length;
+
+		for (let s = 0; s < 100; ++s) {
+
+			let dtheta = new Array(this.theta.length).fill(0.0);
+
+			for (let j = 0; j < 2; ++j) {
+				for (let i = 0; i < this.points[j].length; i++) {
+					let p = this.points[j][i];
+					let y = 1.0 - j;
+					let v = this.g(p) - y;
+
+					var id = 0;
+					for (let x = 0; x <= this.order; ++x) {
+						for (let y = 0; y <= this.order - x; ++y) {
+							var d = v;
+							for (let ix = 0; ix < x; ++ix) d *= p[0];
+							for (let iy = 0; iy < y; ++iy) d *= p[1];
+
+							dtheta[id] += d;
+
+							++id;
+						}
+					}
+				}
+			}
+
+			let alpha = 1.0;
+
+			for (let i = 0; i < this.theta.length; ++i)
+				this.theta[i] -= alpha * dtheta[i] / m;
+		}
+	}
+
+	updateOrder (n) {
+		var gl = this.gl;
+
+		this.order = n;
+
+		var uniforms = "";
+		var formula = "0.0";
+		for (let x = 0; x <= n; ++x) {
+			for (let y = 0; y <= n - x; ++y) {
+				let th = "theta" + x.toString() + y.toString();
+
+				uniforms += "uniform float " + th + ";\n";
+
+				formula += " + " + th;
+				for (let ix = 0; ix < x; ++ix) formula += "*p.x";
+				for (let iy = 0; iy < y; ++iy) formula += "*p.y";
+			}
+		}
+
+		// console.log(uniforms);
+		// console.log(formula);
+
+		this.fieldProgram = this.loadProgram('field-render', {"THETA_UNIFORMS": uniforms, "FORMULA": formula});
+		gl.useProgram(this.fieldProgram);
+		this.fieldProgramVertexLocation = gl.getAttribLocation(this.fieldProgram, "vertex");
+		this.fieldProgramScaleLocation = gl.getUniformLocation(this.fieldProgram, "scale");
+		this.fieldProgramTranslateLocation = gl.getUniformLocation(this.fieldProgram, "translate");
+
+		this.fieldProgramThetaLocation = [];
+		for (let x = 0; x <= n; ++x) {
+			for (let y = 0; y <= n - x; ++y) {
+				let th = "theta" + x.toString() + y.toString();
+				this.fieldProgramThetaLocation.push(gl.getUniformLocation(this.fieldProgram, th));
+			}
+		}
+
+		let newLength = (n + 1) * (n + 2) / 2;
+
+		if (this.theta.length < newLength) {
+			for (let i = this.theta.length; i < newLength; ++i)
+				this.theta.push(0.0);
+		}
+		else {
+			this.theta.length = newLength;
+		}
+	}
+}
+
+var frame;
+var running = true;
+
+function init () {
+	var canvas = document.getElementById("main-canvas");
+	frame = new ClassificationFrame(canvas);
+
+	window.addEventListener('resize', () => { frame.onResize(); frame.draw(); });
+
+	frame.draw();
+
+	var dt = 1000.0 / 16;
+
+	setInterval(() => {
+		frame.step(running ? dt * 0.001 : 0.0);
+		frame.draw();
+	}, dt);
+}
+
+function pointTypeChanged(mode) {
+	frame.mode = mode;
+}
+
+function orderChanged() {
+	let value = parseInt(document.getElementById('order_range').value);
+	document.getElementById('order').innerText = value;
+
+	frame.updateOrder(value);
+}
+
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+}
+#main-canvas {
+	position: absolute;
+	left: 0%;
+	top: 0%;
+	width: 100%;
+	height: 100%;
+}
+#controls {
+	position :absolute;
+	left: 50;
+	top: 50;
+}
+</style>
+</head>
+<body onload="init();">
+
+<canvas id='main-canvas' >
+Your browser doesn't seem to support canvas.
+</canvas>
+
+<div id="controls">
+<input type="radio" id="cross" name="point_type" value="Cross" checked="true" onclick="pointTypeChanged(0);">
+<label for="cross">Cross</label><br>
+<input type="radio" id="circle" name="point_type" value="Circle" onclick="pointTypeChanged(1);">
+<label for="circle">Circle</label><br>
+
+<br>
+
+Order: <span id="order">1</span><br>
+<input type="range" min="1" max="10" value="1" class="slider" id="order_range" oninput="orderChanged();"><br>
+</div>
+
+</body>
+</html>
