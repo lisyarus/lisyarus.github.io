@@ -462,6 +462,20 @@ class ClassificationFrame extends Frame {
 			this.theta.length = newLength;
 		}
 	}
+
+	randomPoint() {
+		let aspectRatio = this.canvas.width / this.canvas.height;
+		return [(2.0 * Math.random() - 1.0) * aspectRatio, (2.0 * Math.random() - 1.0)];
+	}
+
+	randomize (count) {
+		this.points = [[], []];
+
+		for (let i = 0; i < count; ++i) {
+			this.points[0].push(this.randomPoint());
+			this.points[1].push(this.randomPoint());
+		}
+	}
 }
 
 var frame;
@@ -492,6 +506,10 @@ function orderChanged() {
 	document.getElementById('order').innerText = value;
 
 	frame.updateOrder(value);
+}
+
+function randomize() {
+	frame.randomize(10);
 }
 
 </script>
@@ -531,6 +549,10 @@ Your browser doesn't seem to support canvas.
 
 Order: <span id="order">1</span><br>
 <input type="range" min="1" max="10" value="1" class="slider" id="order_range" oninput="orderChanged();"><br>
+
+<br>
+
+<input type="button" value="Random" onclick="randomize();"><br>
 </div>
 
 </body>
