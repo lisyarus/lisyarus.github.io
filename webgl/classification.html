@@ -252,18 +252,23 @@ class ClassificationFrame extends Frame {
 
 		let m = this.screenToWorld(this.mouse);
 
+		this.updateSelection();
+
 		if (this.selection) {
 			let p = this.points[this.selection[0]][this.selection[1]];
 			this.drag = [p[0] - m[0], p[1] - m[1]];
 		}
 		else {
 			this.points[this.mode].push(m);
+			this.selection = [this.mode, this.points[this.mode].length - 1];
+			this.drag = [0.0, 0.0];
 		}
 	}
 
 	onMouseUp (event) {
 		super.onMouseUp(event);
 		this.drag = null;
+		this.selection = null;
 	}
 
 	onMouseMove (event) {
