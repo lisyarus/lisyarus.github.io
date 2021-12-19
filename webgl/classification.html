@@ -528,7 +528,12 @@ function init () {
 	setInterval(() => {
 		frame.step(running ? dt * 0.001 : 0.0);
 		frame.draw();
-		errorSpan.innerText = frame.error().toExponential(5);
+
+		let error = frame.error();
+		if (error > 0.001)
+			errorSpan.innerText = frame.error().toPrecision(5);
+		else
+			errorSpan.innerText = frame.error().toExponential(5);
 	}, dt);
 }
 
