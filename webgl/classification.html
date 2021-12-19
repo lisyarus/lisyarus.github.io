@@ -502,6 +502,12 @@ class ClassificationFrame extends Frame {
 			this.points[1].push(this.randomPoint());
 		}
 	}
+
+	restart () {
+		for (let i = 0; i < this.theta.length; ++i) {
+			this.theta[i] = 2.0 * Math.random() - 1.0;
+		}
+	}
 }
 
 var frame;
@@ -541,6 +547,10 @@ function randomize() {
 	frame.randomize(10);
 }
 
+function restart() {
+	frame.restart();
+}
+
 </script>
 <style type="text/css">
 * {
@@ -570,6 +580,7 @@ Your browser doesn't seem to support canvas.
 
 <div id="controls">
 Error: <span id="error"></span><br>
+<input type="button" value="Restart" onclick="restart();"><br>
 
 <br>
 
