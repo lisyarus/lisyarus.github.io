@@ -422,6 +422,26 @@ class ClassificationFrame extends Frame {
 		}
 	}
 
+	error () {
+		var value = 0.0;
+
+		let m = this.points[0].length + this.points[1].length;
+
+		for (let j = 0; j < 2; ++j) {
+			for (let i = 0; i < this.points[j].length; i++) {
+				let p = this.points[j][i];
+				let v = this.g(p);
+
+				if (j == 0)
+					value -= Math.log(v);
+				else
+					value -= Math.log(1.0 - v);
+			}
+		}
+
+		return value / m;
+	}
+
 	updateOrder (n) {
 		var gl = this.gl;
 
@@ -497,9 +517,12 @@ function init () {
 
 	var dt = 1000.0 / 16;
 
+	var errorSpan = document.getElementById("error");
+
 	setInterval(() => {
 		frame.step(running ? dt * 0.001 : 0.0);
 		frame.draw();
+		errorSpan.innerText = frame.error().toExponential(5);
 	}, dt);
 }
 
@@ -546,6 +569,10 @@ Your browser doesn't seem to support canvas.
 </canvas>
 
 <div id="controls">
+Error: <span id="error"></span><br>
+
+<br>
+
 <input type="radio" id="cross" name="point_type" value="Cross" checked="true" onclick="pointTypeChanged(0);">
 <label for="cross">Cross</label><br>
 <input type="radio" id="circle" name="point_type" value="Circle" onclick="pointTypeChanged(1);">
