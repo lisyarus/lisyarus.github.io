@@ -257,18 +257,24 @@ class ClassificationFrame extends Frame {
 		if (this.selection) {
 			let p = this.points[this.selection[0]][this.selection[1]];
 			this.drag = [p[0] - m[0], p[1] - m[1]];
+			this.dragStart = this.mouse;
 		}
 		else {
 			this.points[this.mode].push(m);
 			this.selection = [this.mode, this.points[this.mode].length - 1];
 			this.drag = [0.0, 0.0];
+			this.dragStart = null;
 		}
 	}
 
 	onMouseUp (event) {
 		super.onMouseUp(event);
+		if (this.dragStart && this.distance(this.mouse, this.dragStart) < 1) {
+			this.points[this.selection[0]].splice(this.selection[1], 1);
+		}
 		this.drag = null;
 		this.selection = null;
+		this.dragStart = null;
 	}
 
 	onMouseMove (event) {
