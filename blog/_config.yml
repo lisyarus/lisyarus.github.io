@@ -28,7 +28,7 @@ twitter_username: lisyarus
 github_username:  lisyarus
 
 # Build settings
-theme: minima
+theme: jekyll-theme-slate
 plugins:
   - jekyll-feed
 
