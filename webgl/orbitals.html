@@ -715,9 +715,9 @@ class Camera
 		this.distance += (this.distanceTarget - this.distance) * (- Math.expm1(- 20.0 * dt));
 	}
 
-	zoom(delta)
+	zoom(factor)
 	{
-		this.distanceTarget *= Math.pow(0.8, delta);
+		this.distanceTarget *= factor;
 		this.distanceSoftTarget = 0.0;
 	}
 
@@ -726,6 +726,12 @@ class Camera
 		let rotX = Quaternion.rotation([0.0, 1.0 - Math.abs(pos[1]), -pos[1]], delta[0] * 0.005);
 		let rotY = Quaternion.rotation([1.0 - Math.abs(pos[0]), 0.0, -pos[0]], delta[1] * 0.005);
 		this.rotation = rotX.mult(rotY.mult(this.rotation));
+	}
+
+	rotateZ(angle)
+	{
+		let rot = Quaternion.rotation([0.0, 0.0, 1.0], angle);
+		this.rotation = rot.mult(this.rotation);
 	}
 }
 
@@ -842,6 +848,8 @@ class OrbitalRenderer
 		this.camera = new Camera();
 
 		this.dragStart = null;
+		this.zoomStart = null;
+		this.rotateStart = null;
 
 		this.setupEvents();
 	}
@@ -852,20 +860,20 @@ class OrbitalRenderer
 		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
 		this.canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
 		this.canvas.onmouseout = (event) => { this.onMouseOut(event); };
-		// this.canvas.ontouchstart = (event) => { this.onMouseDown(event); }
-		// this.canvas.ontouchmove = (event) => { this.onMouseMove(event); }
-		// this.canvas.ontouchend = (event) => { this.onMouseUp(event); }
-		// this.canvas.ontouchcancel = (event) => { this.onMouseUp(event); }
+		this.canvas.ontouchstart = (event) => { this.onTouchStart(event); }
+		this.canvas.ontouchmove = (event) => { this.onTouchMove(event); }
+		this.canvas.ontouchend = (event) => { this.onTouchEnd(event); }
+		this.canvas.ontouchcancel = (event) => { this.onTouchEnd(event); }
 	}
 
 	onMouseWheel(event)
 	{
-		this.camera.zoom(- event.deltaY / 120.0);
+		this.camera.zoom(Math.pow(0.8, - event.deltaY / 120.0));
 	}
 
 	onMouseDown(event)
 	{
-		this.dragStart = [event.offsetX, event.offsetY];
+		this.dragStart = [event.clientX, event.clientY];
 	}
 
 	onMouseUp(event)
@@ -879,17 +887,72 @@ class OrbitalRenderer
 		{
 			let rect = canvas.getBoundingClientRect();
 
-			let pos = [(event.offsetX - rect.width / 2.0) / rect.height, 1.0 - 2.0 * event.offsetY / rect.height];
-			let drag = [event.offsetX - this.dragStart[0], event.offsetY - this.dragStart[1]];
+			let pos = [(event.clientX - rect.width / 2.0) / rect.height, 1.0 - 2.0 * event.clientY / rect.height];
+			let drag = [event.clientX - this.dragStart[0], event.clientY - this.dragStart[1]];
 			this.camera.rotate(pos, drag);
 
-			this.dragStart = [event.offsetX, event.offsetY];
+			this.dragStart = [event.clientX, event.clientY];
 		}
 	}
 
 	onMouseOut(event)
 	{
 		this.dragStart = null;
+	}
+
+	onTouchStart(event)
+	{
+		if (event.touches.length == 1)
+		{
+			this.dragStart = [event.touches[0].clientX, event.touches[0].clientY];
+		}
+		else if (event.touches.length == 2)
+		{
+			let dx = event.touches[1].clientX - event.touches[0].clientX;
+			let dy = event.touches[1].clientY - event.touches[0].clientY;
+			this.zoomStart = Math.hypot(dx, dy);
+			this.rotateStart = Math.atan2(dy, dx);
+		}
+
+		event.preventDefault();
+	}
+
+	onTouchMove(event)
+	{
+		if (event.touches.length == 1 && this.dragStart)
+		{
+			let rect = canvas.getBoundingClientRect();
+			let touch = event.touches[0];
+
+			let pos = [(touch.clientX - rect.width / 2.0) / rect.height, 1.0 - 2.0 * touch.clientY / rect.height];
+			let drag = [touch.clientX - this.dragStart[0], touch.clientY - this.dragStart[1]];
+			this.camera.rotate(pos, drag);
+
+			this.dragStart = [touch.clientX, touch.clientY];
+		}
+		else if (event.touches.length == 2 && this.zoomStart)
+		{
+			let dx = event.touches[1].clientX - event.touches[0].clientX;
+			let dy = event.touches[1].clientY - event.touches[0].clientY;
+
+			let newZoom = Math.hypot(dx, dy);
+			this.camera.zoom(this.zoomStart / newZoom);
+			this.zoomStart = newZoom;
+
+			let newRotate = Math.atan2(dy, dx);
+			this.camera.rotateZ(this.rotateStart - newRotate);
+			this.rotateStart = newRotate;
+		}
+
+		event.preventDefault();
+	}
+
+	onTouchEnd(event)
+	{
+		this.dragStart = null;
+		this.zoomStart = null;
+		this.rotateStart = null;
+		event.preventDefault();
 	}
 
 	update()
@@ -1225,7 +1288,7 @@ function onPageLoaded()
 
 	toggleDarkMode();
 	setRenderMode("cloud");
-	setOrbital(0);
+	setOrbital(6);
 	setQuality(1);
 
 	addEventListener("resize", onPageResize);
@@ -1262,12 +1325,12 @@ function onPageLoaded()
 
 <td>
 <div>
-<svg width="180" height="50">
+<svg width="145" height="50">
 <g class="ui-button" id="cloud-button" onclick="setRenderMode('cloud');">
-<path d="M70,10 v30 h-50 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h50" />
+<path d="M65,10 v30 h-45 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h45" />
 </g>
 <g class="ui-button" id="isosurface-button" onclick="setRenderMode('isosurface');">
-<path d="M70,10 v30 h90 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-90" />
+<path d="M65,10 v30 h60 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-60" />
 </g>
 </svg>
 </div>
@@ -1477,7 +1540,7 @@ function onPageLoaded()
 </div>
 
 <span class="ui-button-caption" id="cloud-button-caption">Cloud</span>
-<span class="ui-button-caption" id="isosurface-button-caption">Isosurface</span>
+<span class="ui-button-caption" id="isosurface-button-caption">Surface</span>
 
 <span class="ui-button-caption" id="x-button-caption">X</span>
 <span class="ui-button-caption" id="y-button-caption">Y</span>
