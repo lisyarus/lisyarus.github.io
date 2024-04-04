@@ -1,0 +1,1526 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:fb="http://ogp.me/ns/fb#">
+
+<head>
+
+<title>Atomic orbitals visualization</title>
+<meta property="og:image" content="https://lisyarus.github.io/webgl/orbitals_preview_16_9.png" />
+<meta property="og:image:width" content="640" />
+<meta property="og:image:height" content="360" />
+
+<style>
+
+/* Light palette: https://www.color-hex.com/color-palette/106748 */
+
+body {
+	background: var(--background);
+	color: var(--text);
+	font-family: sans-serif;
+
+	height: 100%;
+	margin: 0px;
+}
+
+table, th, td {
+	border-collapse: collapse;
+	border: 0px;
+	padding: 0px;
+	color: var(--text);
+}
+
+#webgl-canvas {
+	position: fixed;
+	left: 0;
+	top: 0;
+	height: 100%;
+}
+
+#ui-panel {
+	background: var(--background-transparent);
+	position: fixed;
+	width: 100%;
+	bottom: 0;
+	backdrop-filter: blur(100px);
+}
+
+.ui-button {
+	fill: transparent;
+	stroke: var(--text);
+	stroke-width: 1.5;
+	opacity:1;
+	transition: 0.125s;
+}
+
+.ui-button:hover {
+	cursor: pointer;
+	stroke: var(--hover);
+	transition: 0.125s;
+}
+
+.filled {
+	fill: var(--text);
+/*	stroke: transparent;*/
+	transition: 0.125s;
+}
+
+.ui-button.filled:hover {
+	fill: var(--hover);
+/*	stroke: transparent;*/
+	transition: 0.125s;
+}
+
+.ui-button:hover .filled {
+	fill: var(--hover);
+/*	stroke: transparent;*/
+	transition: 0.125s;
+}
+
+.ui-button-caption {
+	position: fixed;
+	pointer-events: none;
+	transition: 0.125s;
+}
+
+.ui-button-caption.active {
+	color: var(--background);
+	transition: 0.125s;
+}
+
+a {
+	color: var(--text);
+	transition: 0.125s;
+}
+
+a:hover {
+	color: var(--hover);
+	transition: 0.125s;
+}
+
+.faded {
+	opacity: var(--fade-opacity);
+	transition: 0.125s;
+}
+
+.faded:hover {
+	opacity: 1;
+	transition: 0.125s;
+}
+
+</style>
+
+<script type="text/glsl" id="orbital-vs">#version 300 es
+
+uniform mat4 u_camera_transform;
+
+out vec3 camera_position;
+out vec3 ray_direction;
+out vec2 screen_position;
+
+vec3 perspective_divide(vec4 p)
+{
+	return p.xyz / p.w;
+}
+
+void main()
+{
+	if (gl_VertexID == 0)
+	{
+		screen_position = vec2(-1.0, -1.0);
+	}
+	else if (gl_VertexID == 1)
+	{
+		screen_position = vec2(3.0, -1.0);
+	}
+	else
+	{
+		screen_position = vec2(-1.0, 3.0);
+	}
+
+	gl_Position = vec4(screen_position, 0.0, 1.0);
+
+	mat4 inverse_camera_transform = inverse(u_camera_transform);
+	camera_position = perspective_divide(inverse_camera_transform * vec4(0.0, 0.0, -1.0, 0.0));
+	ray_direction = perspective_divide(inverse_camera_transform * vec4(screen_position, -1.0, 1.0)) - camera_position;
+}
+</script>
+
+<script type="text/glsl" id="orbital-fs">#version 300 es
+precision highp float;
+
+uniform mat4 u_camera_view;
+
+uniform int u_orbital;
+uniform float u_radius;
+uniform float u_amplify;
+
+uniform vec3 u_positive_color;
+uniform vec3 u_negative_color;
+
+uniform int u_render_mode;
+uniform vec3 u_cut;
+uniform int u_quality;
+
+const int CLOUD = 0;
+const int ISOSURFACE = 1;
+
+in vec3 camera_position;
+in vec3 ray_direction;
+in vec2 screen_position;
+
+out vec4 out_color;
+
+vec2 intersect_bounding_sphere(vec3 ro, vec3 rd)
+{
+	float radius = u_radius;
+	// t^2 + 2 ro*rd + ro*2-1 = 0
+	float rord = dot(ro, rd);
+	float roro = dot(ro, ro);
+	float D4 = rord * rord - roro + radius * radius;
+	if (D4 < 0.0)
+	{
+		return vec2(0.0, 0.0);
+	}
+
+	float sqrtD4 = sqrt(D4);
+	float t1 = - rord - sqrtD4;
+	float t2 = - rord + sqrtD4;
+
+	return vec2(max(0.0, t1), max(0.0, t2));
+}
+
+const float pi = 3.1415926535;
+
+float laguerre_1_1(float x)
+{
+	return 2.0 - x;
+}
+
+float laguerre_1_3(float x)
+{
+	return 4.0 - x;
+}
+
+float laguerre_1_5(float x)
+{
+	return 6.0 - x;
+}
+
+float laguerre_2_1(float x)
+{
+	return (x * 0.5 - 3.0) * x + 3.0;
+}
+
+float laguerre_2_3(float x)
+{
+	return (x / 2.0 - 5.0) * x + 10.0;
+}
+
+float laguerre_3_1(float x)
+{
+	return ((- x / 6.0 + 2.0) * x - 6.0) * x + 4.0;
+}
+
+float orbital_1s0(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r;
+	return sqrt(1.0 / 4.0 / pi) * 2.0 * exp(- r2n / 2.0);
+}
+
+float orbital_2s0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r;
+	return sqrt(1.0 / 4.0 / pi) * sqrt(1.0 / 8.0) * exp(- r2n / 2.0) * laguerre_1_1(r2n);
+}
+
+float orbital_2p0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r;
+	return sqrt(3.0 / 4.0 / pi) * p.x / r * sqrt(1.0 / 24.0) * exp(- r2n / 2.0) * r2n;
+}
+
+float orbital_2p1(vec3 p)
+{
+	float r = length(p);
+	float r2n = r;
+	return sqrt(3.0 / 4.0 / pi) * p.y / r * sqrt(1.0 / 24.0) * exp(- r2n / 2.0) * r2n;
+}
+
+float orbital_2p2(vec3 p)
+{
+	float r = length(p);
+	float r2n = r;
+	return sqrt(3.0 / 4.0 / pi) * p.z / r * sqrt(1.0 / 24.0) * exp(- r2n / 2.0) * r2n;
+}
+
+float orbital_3s0(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(1.0 / 4.0 / pi) * sqrt(4.0 / 243.0) * exp(- r2n / 2.0) * laguerre_2_1(r2n);
+}
+
+float orbital_3p0(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(3.0 / 4.0 / pi) * p.x / r * sqrt(1.0 / 486.0) * exp(- r2n / 2.0) * r2n * laguerre_1_3(r2n);
+}
+
+float orbital_3p1(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(3.0 / 4.0 / pi) * p.y / r * sqrt(1.0 / 486.0) * exp(- r2n / 2.0) * r2n * laguerre_1_3(r2n);
+}
+
+float orbital_3p2(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(3.0 / 4.0 / pi) * p.z / r * sqrt(1.0 / 486.0) * exp(- r2n / 2.0) * r2n * laguerre_1_3(r2n);
+}
+
+float orbital_3d0(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(15.0 / 4.0 / pi) * p.x * p.y / r / r * sqrt(1.0 / 2430.0) * exp(- r2n / 2.0) * r2n * r2n;
+}
+
+float orbital_3d1(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(15.0 / 4.0 / pi) * p.y * p.z / r / r * sqrt(1.0 / 2430.0) * exp(- r2n / 2.0) * r2n * r2n;
+}
+
+float orbital_3d2(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(5.0 / 16.0 / pi) * (3.0 * p.z * p.z / r / r - 1.0) * sqrt(1.0 / 2430.0) * exp(- r2n / 2.0) * r2n * r2n;
+}
+
+float orbital_3d3(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(15.0 / 4.0 / pi) * p.x * p.z / r / r * sqrt(1.0 / 2430.0) * exp(- r2n / 2.0) * r2n * r2n;
+}
+
+float orbital_3d4(vec3 p)
+{
+	float r = length(p);
+	float r2n = 2.0 * r / 3.0;
+	return sqrt(15.0 / 16.0 / pi) * (p.x * p.x - p.y * p.y) / r / r * sqrt(1.0 / 2430.0) * exp(- r2n / 2.0) * r2n * r2n;
+}
+
+float orbital_4s0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(1.0 / 4.0 / pi) * sqrt(1.0 / 256.0) * exp(- r2n / 2.0) * laguerre_3_1(r2n);
+}
+
+float orbital_4p0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(3.0 / 4.0 / pi) * p.x / r * sqrt(1.0 / 3840.0) * exp(- r2n / 2.0) * r2n * laguerre_2_3(r2n);
+}
+
+float orbital_4p1(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(3.0 / 4.0 / pi) * p.y / r * sqrt(1.0 / 3840.0) * exp(- r2n / 2.0) * r2n * laguerre_2_3(r2n);
+}
+
+float orbital_4p2(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(3.0 / 4.0 / pi) * p.z / r * sqrt(1.0 / 3840.0) * exp(- r2n / 2.0) * r2n * laguerre_2_3(r2n);
+}
+
+float orbital_4d0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(15.0 / 4.0 / pi) * p.x * p.y / r / r * sqrt(1.0 / 46080.0) * exp(- r2n / 2.0) * r2n * r2n * laguerre_1_5(r2n);
+}
+
+float orbital_4d1(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(15.0 / 4.0 / pi) * p.y * p.z / r / r * sqrt(1.0 / 46080.0) * exp(- r2n / 2.0) * r2n * r2n * laguerre_1_5(r2n);
+}
+
+float orbital_4d2(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(5.0 / 16.0 / pi) * (3.0 * p.z * p.z / r / r - 1.0) * sqrt(1.0 / 46080.0) * exp(- r2n / 2.0) * r2n * r2n * laguerre_1_5(r2n);
+}
+
+float orbital_4d3(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(15.0 / 4.0 / pi) * p.x * p.z / r / r * sqrt(1.0 / 46080.0) * exp(- r2n / 2.0) * r2n * r2n * laguerre_1_5(r2n);
+}
+
+float orbital_4d4(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(15.0 / 16.0 / pi) * (p.x * p.x - p.y * p.y) / r / r * sqrt(1.0 / 46080.0) * exp(- r2n / 2.0) * r2n * r2n * laguerre_1_5(r2n);
+}
+
+float orbital_4f0(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(35.0 / 32.0 / pi) * (p.y * (3.0 * p.x * p.x - p.y * p.y)) / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f1(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(105.0 / 4.0 / pi) * p.x * p.y * p.z / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f2(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(21.0 / 32.0 / pi) * (p.y * (5.0 * p.z * p.z - r * r)) / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f3(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(7.0 / 16.0 / pi) * (5.0 * p.z * p.z * p.z - 3.0 * p.z * r * r) / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f4(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(21.0 / 32.0 / pi) * (p.x * (5.0 * p.z * p.z - r * r)) / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f5(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(105.0 / 4.0 / pi) * (p.x * p.x - p.y * p.y) * p.z / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float orbital_4f6(vec3 p)
+{
+	float r = length(p);
+	float r2n = r / 2.0;
+	return sqrt(35.0 / 32.0 / pi) * p.x * (p.x * p.x - 3.0 * p.y * p.y) / r / r / r * sqrt(1.0 / 322560.0) * exp(- r2n / 2.0) * r2n * r2n * r2n;
+}
+
+float wavefunction(vec3 p)
+{
+	switch (u_orbital)
+	{
+		case  0: return orbital_1s0(p);
+		case  1: return orbital_2s0(p);
+		case  2: return orbital_2p0(p);
+		case  3: return orbital_2p1(p);
+		case  4: return orbital_2p2(p);
+		case  5: return orbital_3s0(p);
+		case  6: return orbital_3p0(p);
+		case  7: return orbital_3p1(p);
+		case  8: return orbital_3p2(p);
+		case  9: return orbital_3d0(p);
+		case 10: return orbital_3d1(p);
+		case 11: return orbital_3d2(p);
+		case 12: return orbital_3d3(p);
+		case 13: return orbital_3d4(p);
+		case 14: return orbital_4s0(p);
+		case 15: return orbital_4p0(p);
+		case 16: return orbital_4p1(p);
+		case 17: return orbital_4p2(p);
+		case 18: return orbital_4d0(p);
+		case 19: return orbital_4d1(p);
+		case 20: return orbital_4d2(p);
+		case 21: return orbital_4d3(p);
+		case 22: return orbital_4d4(p);
+		case 23: return orbital_4f0(p);
+		case 24: return orbital_4f1(p);
+		case 25: return orbital_4f2(p);
+		case 26: return orbital_4f3(p);
+		case 27: return orbital_4f4(p);
+		case 28: return orbital_4f5(p);
+		case 29: return orbital_4f6(p);
+	}
+	return 0.0;
+}
+
+float func(vec3 p)
+{
+	return wavefunction(p)
+		* mix(1.0, smoothstep(0.5, -0.5, p.x), u_cut.x)
+		* mix(1.0, smoothstep(0.5, -0.5, p.y), u_cut.y)
+		* mix(1.0, smoothstep(0.5, -0.5, p.z), u_cut.z)
+		;
+}
+
+float smootherstep(float edge0, float edge1, float x) 
+{
+    x = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+    return x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
+}
+
+void main()
+{
+	vec3 ro = camera_position;
+	vec3 rd = normalize(ray_direction);
+
+	vec2 t_range = intersect_bounding_sphere(ro, rd);
+
+	if (t_range.y <= t_range.x)
+	{
+		//out_color = vec4(0.1, 0.0, 0.1, 1.0);
+		out_color = vec4(0.0);
+		return;
+	}
+
+	vec3 light_direction = transpose(mat3(u_camera_view)) * normalize(vec3(2.0, 3.0, 1.0));
+
+	int steps = u_quality;
+
+	float isosurface = u_amplify;
+
+	vec3 intensity = vec3(0.0);
+	float opacity = 0.0;
+	float dt = (t_range.y - t_range.x) / float(steps);
+
+	float prev_value = 0.0;
+	for (int i = 0; i < steps; ++i)
+	{
+		float t = t_range.x + dt * (float(i) + 0.5);
+
+		vec3 p = ro + rd * t;
+		float value = func(p);
+		//if (abs(value) < 0.01)
+		//	value = 0.0;
+		if (u_render_mode == CLOUD)
+			value = value * abs(value) * u_amplify;
+		//value = value * 10.0;
+
+		float segment_opacity = 1.0 - exp(- dt * abs(value));
+
+		vec3 color;
+		if (value > 0.0)
+		{
+			color = u_positive_color;
+		}
+		else
+		{
+			color = u_negative_color;
+		}
+
+		if (u_render_mode == CLOUD)
+		{
+			intensity += (1.0 - opacity) * segment_opacity * color;
+			opacity += (1.0 - opacity) * segment_opacity;
+		}
+
+		if (u_render_mode == ISOSURFACE && abs(value) > isosurface)
+		{					
+			if (i > 0)
+			{
+				// vprev * (1-s) + v * s = isosurface
+				// s * (v - vprev) = ospsirface - vprev
+
+				float s = (isosurface - abs(prev_value)) / (abs(value) - abs(prev_value));
+				t += (s - 1.0) * dt;
+				p = ro + rd * t;
+				value = func(p);
+			}
+
+			vec2 eps = vec2(0.001, 0.0);
+			float vx = func(p + eps.xyy);
+			float vy = func(p + eps.yxy);
+			float vz = func(p + eps.yyx);
+
+			vec3 grad = (vec3(vx, vy, vz) - vec3(value)) / eps.x;
+
+			vec3 normal = normalize(grad) * (value < 0.0 ? 1.0 : -1.0);
+
+			vec3 to_camera = normalize(camera_position - p);
+			vec3 halfway = normalize(to_camera + light_direction);
+
+			vec3 diffuse = color * (0.5 + 0.5 * dot(normal, light_direction));
+			vec3 specular = vec3(0.25) * pow(max(0.0, dot(normal, halfway)), 32.0);
+
+			intensity = diffuse + specular;
+			opacity = 1.0;
+			break;
+		}
+
+		prev_value = value;
+	}
+
+	out_color = vec4(intensity, opacity);
+}
+</script>
+
+<script type="text/javascript">
+
+function radians(deg)
+{
+	return deg * Math.PI / 180.0;
+}
+
+class Matrix4
+{
+	constructor(diag = 0)
+	{
+		this.coords = new Float32Array([diag, 0, 0, 0, 0, diag, 0, 0, 0, 0, diag, 0, 0, 0, 0, diag]);
+	}
+
+	mult(other)
+	{
+		var result = new Matrix4();
+		for (let i = 0; i < 4; ++i)
+			for (let j = 0; j < 4; ++j)
+				for (let k = 0; k < 4; ++k)
+					result.coords[4 * i + j] += this.coords[4 * i + k] * other.coords[4 * k + j];
+		return result;
+	}
+
+	static translation(vector)
+	{
+		var result = new Matrix4(1.0);
+		result.coords[0 * 4 + 3] = vector[0];
+		result.coords[1 * 4 + 3] = vector[1];
+		result.coords[2 * 4 + 3] = vector[2];
+		return result;
+	}
+}
+
+class Quaternion
+{
+	constructor()
+	{
+		this.coords = new Float32Array([0, 0, 0, 1]);
+	}
+
+	mult(other)
+	{
+		var result = new Quaternion();
+		result.coords[0] = this.coords[3] * other.coords[0] + this.coords[0] * other.coords[3] + this.coords[1] * other.coords[2] - this.coords[2] * other.coords[1];
+		result.coords[1] = this.coords[3] * other.coords[1] + this.coords[1] * other.coords[3] + this.coords[2] * other.coords[0] - this.coords[0] * other.coords[2];
+		result.coords[2] = this.coords[3] * other.coords[2] + this.coords[2] * other.coords[3] + this.coords[0] * other.coords[1] - this.coords[1] * other.coords[0];
+		result.coords[3] = - this.coords[0] * other.coords[0] - this.coords[1] * other.coords[1] - this.coords[2] * other.coords[2] + this.coords[3] * other.coords[3];
+		return result;
+	}
+
+	static rotation(axis, angle)
+	{
+		let r = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+
+		let c = Math.cos(angle / 2.0);
+		let s = Math.sin(angle / 2.0);
+
+		var result = new Quaternion();
+		result.coords[0] = axis[0] * s / r;
+		result.coords[1] = axis[1] * s / r;
+		result.coords[2] = axis[2] * s / r;
+		result.coords[3] = c;
+		return result;
+	}
+
+	matrix()
+	{
+		var result = new Matrix4();
+		result.coords[0 * 4 + 0] = 1.0 - 2.0 * (this.coords[1] * this.coords[1] + this.coords[2] * this.coords[2]);
+		result.coords[0 * 4 + 1] = 2.0 * (this.coords[0] * this.coords[1] - this.coords[2] * this.coords[3]);
+		result.coords[0 * 4 + 2] = 2.0 * (this.coords[0] * this.coords[2] + this.coords[1] * this.coords[3]);
+		result.coords[1 * 4 + 0] = 2.0 * (this.coords[0] * this.coords[1] + this.coords[2] * this.coords[3]);
+		result.coords[1 * 4 + 1] = 1.0 - 2.0 * (this.coords[0] * this.coords[0] + this.coords[2] * this.coords[2]);
+		result.coords[1 * 4 + 2] = 2.0 * (this.coords[1] * this.coords[2] - this.coords[0] * this.coords[3]);
+		result.coords[2 * 4 + 0] = 2.0 * (this.coords[0] * this.coords[2] - this.coords[1] * this.coords[3]);
+		result.coords[2 * 4 + 1] = 2.0 * (this.coords[1] * this.coords[2] + this.coords[0] * this.coords[3]);
+		result.coords[2 * 4 + 2] = 1.0 - 2.0 * (this.coords[0] * this.coords[0] + this.coords[1] * this.coords[1]);
+		result.coords[3 * 4 + 3] = 1.0;
+		return result;
+	}
+}
+
+class Camera
+{
+	constructor()
+	{
+		this.rotation = new Quaternion();
+		this.nearClip = 1.0;
+		this.farClip = 10.0;
+		this.left = -1.0;
+		this.right = 1.0;
+		this.bottom = -1.0;
+		this.top = 1.0;
+		this.distance = 10.0;
+		this.distanceTarget = this.distance;
+		this.distanceSoftTarget = 0.0;
+	}
+
+	setBounds(left, right, bottom, top)
+	{
+		this.left = left;
+		this.right = right;
+		this.bottom = bottom;
+		this.top = top;
+	}
+
+	transformMatrix()
+	{
+		return this.projectionMatrix().mult(this.viewMatrix());
+	}
+
+	projectionMatrix()
+	{
+		var result = new Matrix4();
+		result.coords[0 * 4 + 0] = 2.0 * this.nearClip / (this.right - this.left);
+		result.coords[1 * 4 + 1] = 2.0 * this.nearClip / (this.top - this.bottom);
+		result.coords[0 * 4 + 2] = (this.right + this.left) / (this.right - this.left);
+		result.coords[1 * 4 + 2] = (this.top + this.bottom) / (this.top - this.bottom);
+		result.coords[2 * 4 + 2] = (this.nearClip + this.farClip) / (this.nearClip - this.farClip);
+		result.coords[2 * 4 + 3] = 2.0 * this.nearClip * this.farClip / (this.nearClip - this.farClip);
+		result.coords[3 * 4 + 2] = -1.0;
+		return result;
+	}
+
+	viewMatrix()
+	{
+		return Matrix4.translation([0.0, 0.0, -this.distance]).mult(this.rotation.matrix());
+	}
+
+	update(dt)
+	{
+		if (this.distanceTarget < this.distanceSoftTarget)
+			this.distanceTarget += (this.distanceSoftTarget - this.distanceTarget) * (- Math.expm1(- 5.0 * dt));
+
+		this.distance += (this.distanceTarget - this.distance) * (- Math.expm1(- 20.0 * dt));
+	}
+
+	zoom(delta)
+	{
+		this.distanceTarget *= Math.pow(0.8, delta);
+		this.distanceSoftTarget = 0.0;
+	}
+
+	rotate(pos, delta)
+	{
+		let rotX = Quaternion.rotation([0.0, 1.0 - Math.abs(pos[1]), -pos[1]], delta[0] * 0.005);
+		let rotY = Quaternion.rotation([1.0 - Math.abs(pos[0]), 0.0, -pos[0]], delta[1] * 0.005);
+		this.rotation = rotX.mult(rotY.mult(this.rotation));
+	}
+}
+
+let radius = [
+	5.0,
+	15.0,
+	15.0,
+	15.0,
+	15.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	30.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+	50.0,
+];
+
+let amplify = [
+	200.0,
+	200.0,
+	300.0,
+	300.0,
+	300.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	500.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+	2000.0,
+];
+
+let isosurface = [
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.005,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+	0.002,
+];
+
+class OrbitalRenderer
+{
+	constructor(canvas)
+	{
+		this.canvas = canvas;
+		this.gl = canvas.getContext("webgl2");
+		this.timestamp = Date.now();
+
+		this.orbitalProgram = this.loadProgram("orbital");
+		this.orbitalVAO = this.gl.createVertexArray();
+
+		this.camera = new Camera();
+
+		this.dragStart = null;
+
+		this.setupEvents();
+	}
+
+	setupEvents () {
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.canvas.onmousewheel = (event) => { this.onMouseWheel(event); };
+		this.canvas.onmouseout = (event) => { this.onMouseOut(event); };
+		// this.canvas.ontouchstart = (event) => { this.onMouseDown(event); }
+		// this.canvas.ontouchmove = (event) => { this.onMouseMove(event); }
+		// this.canvas.ontouchend = (event) => { this.onMouseUp(event); }
+		// this.canvas.ontouchcancel = (event) => { this.onMouseUp(event); }
+	}
+
+	onMouseWheel(event)
+	{
+		this.camera.zoom(- event.deltaY / 120.0);
+	}
+
+	onMouseDown(event)
+	{
+		this.dragStart = [event.offsetX, event.offsetY];
+	}
+
+	onMouseUp(event)
+	{
+		this.dragStart = null;
+	}
+
+	onMouseMove(event)
+	{
+		if (this.dragStart)
+		{
+			let rect = canvas.getBoundingClientRect();
+
+			let pos = [(event.offsetX - rect.width / 2.0) / rect.height, 1.0 - 2.0 * event.offsetY / rect.height];
+			let drag = [event.offsetX - this.dragStart[0], event.offsetY - this.dragStart[1]];
+			this.camera.rotate(pos, drag);
+
+			this.dragStart = [event.offsetX, event.offsetY];
+		}
+	}
+
+	onMouseOut(event)
+	{
+		this.dragStart = null;
+	}
+
+	update()
+	{
+		let now = Date.now();
+		let dt = (now - this.timestamp) / 1000.0;
+		this.timestamp = now;
+
+		this.camera.update(dt);
+	}
+
+	renderFrame(orbital, darkMode, renderMode, xCut, yCut, zCut, quality)
+	{
+		let gl = this.gl;
+
+		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		gl.clearColor(0, 0, 0, 0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.useProgram(this.orbitalProgram);
+		this.orbitalProgram.u_camera_transform = this.camera.transformMatrix();
+		this.orbitalProgram.u_camera_view = this.camera.viewMatrix();
+
+		this.orbitalProgram.u_orbital = orbital;
+		this.orbitalProgram.u_radius = radius[orbital];
+		this.orbitalProgram.u_amplify = (renderMode == 'cloud') ? amplify[orbital] : isosurface[orbital];
+
+		if (darkMode)
+		{
+			this.orbitalProgram.u_positive_color = [1.0, 0.75, 0.5];
+			this.orbitalProgram.u_negative_color = [0.5, 0.75, 1.0];
+		}
+		else
+		{
+			this.orbitalProgram.u_positive_color = [1.0, 0.5, 0.125];
+			this.orbitalProgram.u_negative_color = [0.125, 0.5, 1.0];
+		}
+		this.orbitalProgram.u_render_mode = (renderMode == 'cloud') ? 0 : 1;
+		this.orbitalProgram.u_cut = [xCut ? 1.0 : 0.0, yCut ? 1.0 : 0.0, zCut ? 1.0 : 0.0];
+		this.orbitalProgram.u_quality = Math.pow(2.0, 4.0 + quality);
+
+		gl.bindVertexArray(this.orbitalVAO);
+		gl.drawArrays(gl.TRIANGLES, 0, 3);
+	}
+
+	loadShader(name, type) {
+		let gl = this.gl;
+
+		let script = document.getElementById(name);
+		if (script == null)
+		{
+			throw new Error("Shader " + name + " not found");
+		}
+
+		let source = script.textContent;
+		
+		let shader = gl.createShader(type);
+		gl.shaderSource(shader, source);
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+		{
+			throw new Error("Shader " + name + ": " + gl.getShaderInfoLog(shader));
+		}
+
+		return shader;
+	}
+
+	loadProgram(name) {
+		let gl = this.gl;
+
+		let program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+		{
+			throw new Error("Program " + name + ": " + gl.getProgramInfoLog(program));
+		}
+
+		let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+		for (let u = 0; u < uniformCount; ++u) 
+		{
+			let uniformInfo = gl.getActiveUniform(program, u);
+			let name = uniformInfo.name;
+			let location = gl.getUniformLocation(program, name);
+			Object.defineProperty(program, name, 
+			{
+				get: () => {
+					return {
+						location: location
+					};
+				},
+				set: (value) => {
+					if (uniformInfo.type == gl.FLOAT_MAT4) {
+						gl.uniformMatrix4fv(location, true, value.coords);
+					}
+					if (uniformInfo.type == gl.FLOAT) {
+						gl.uniform1f(location, value);
+					}
+					if (uniformInfo.type == gl.FLOAT_VEC3) {
+						gl.uniform3f(location, value[0], value[1], value[2]);
+					}
+					if (uniformInfo.type == gl.INT) {
+						gl.uniform1i(location, value);
+					}
+				}
+			});
+		}
+
+		let attributeCount = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+		for (let a = 0; a < attributeCount; ++a)
+		{
+			let attributeInfo = gl.getActiveAttrib(program, a);
+			let name = attributeInfo.name;
+			let location = gl.getAttribLocation(program, name);
+			Object.defineProperty(program, name, 
+			{
+				get: () => {
+					return {
+						location: location,
+						enable: () => {
+							gl.enableVertexAttribArray(location);
+						}
+					};
+				},
+				set: (value) => { 
+					if (attributeInfo.type == gl.FLOAT_VEC2) {
+						gl.vertexAttribPointer(location, 2, gl.FLOAT, value[0], value[1], value[2]);
+					}
+					if (attributeInfo.type == gl.FLOAT_VEC3) {
+						gl.vertexAttribPointer(location, 3, gl.FLOAT, value[0], value[1], value[2]);
+					}
+				}
+			});
+		}
+
+		return program;
+	}
+}
+
+var darkModeOn = false;
+var renderMode = "cloud";
+var xCut = false;
+var yCut = false;
+var zCut = false;
+var quality = null;
+var orbital = null;
+
+var canvas = null;
+var uiPanel = null;
+
+var renderer = null;
+	
+function toggleDarkMode()
+{
+	darkModeOn = !darkModeOn;
+
+	if (darkModeOn)
+	{
+		document.documentElement.style.setProperty('--background', '#111111');
+		document.documentElement.style.setProperty('--background-transparent', '#1111117f');
+		document.documentElement.style.setProperty('--text', '#dfefff');
+		document.documentElement.style.setProperty('--hover', '#ffffff');
+		document.documentElement.style.setProperty('--fade-opacity', '0.25');
+	}
+	else
+	{
+		document.documentElement.style.setProperty('--background', '#fafafa');
+		document.documentElement.style.setProperty('--background-transparent', '#fafafa7f');
+		document.documentElement.style.setProperty('--text', '#484b6a');
+		document.documentElement.style.setProperty('--hover', '#4c539e');
+		document.documentElement.style.setProperty('--fade-opacity', '0.5');
+	}
+
+	document.getElementById("theme-toggle-rect").setAttribute('x', darkModeOn ? '14px' : '34px');
+}
+
+function setRenderMode(mode)
+{
+	renderMode = mode;
+
+	if (mode == 'cloud')
+	{
+		document.getElementById("cloud-button").classList.add('filled');
+		document.getElementById("cloud-button-caption").classList.add('active');
+		document.getElementById("isosurface-button").classList.remove('filled');
+		document.getElementById("isosurface-button-caption").classList.remove('active');
+	}
+	else
+	{
+		document.getElementById("cloud-button").classList.remove('filled');
+		document.getElementById("cloud-button-caption").classList.remove('active');
+		document.getElementById("isosurface-button").classList.add('filled');
+		document.getElementById("isosurface-button-caption").classList.add('active');
+	}
+}
+
+function setOrbital(o)
+{
+	if (!(orbital === null))
+	{
+		document.getElementById("orbital" + orbital + "-button").classList.remove('filled');
+		document.getElementById("orbital" + orbital + "-button-caption").classList.remove('active');
+	}
+
+	orbital = o;
+
+	document.getElementById("orbital" + orbital + "-button").classList.add('filled');
+	document.getElementById("orbital" + orbital + "-button-caption").classList.add('active');
+
+	renderer.camera.distanceSoftTarget = radius[o] * 1.5;
+}
+
+function toggleXCut()
+{
+	xCut = !xCut;
+
+	if (xCut)
+	{
+		document.getElementById("x-button").classList.add('filled');
+		document.getElementById("x-button-caption").classList.add('active');
+	}
+	else
+	{
+		document.getElementById("x-button").classList.remove('filled');
+		document.getElementById("x-button-caption").classList.remove('active');
+	}
+}
+
+function toggleYCut()
+{
+	yCut = !yCut;
+
+	if (yCut)
+	{
+		document.getElementById("y-button").classList.add('filled');
+		document.getElementById("y-button-caption").classList.add('active');
+	}
+	else
+	{
+		document.getElementById("y-button").classList.remove('filled');
+		document.getElementById("y-button-caption").classList.remove('active');
+	}
+}
+
+function toggleZCut()
+{
+	zCut = !zCut;
+
+	if (zCut)
+	{
+		document.getElementById("z-button").classList.add('filled');
+		document.getElementById("z-button-caption").classList.add('active');
+	}
+	else
+	{
+		document.getElementById("z-button").classList.remove('filled');
+		document.getElementById("z-button-caption").classList.remove('active');
+	}
+}
+
+function setQuality(q)
+{
+	if (!(quality === null))
+	{
+		document.getElementById("quality" + quality + "-button").classList.remove('filled');
+		document.getElementById("quality" + quality + "-button-caption").classList.remove('active');
+	}
+
+	quality = q;
+
+	document.getElementById("quality" + quality + "-button").classList.add('filled');
+	document.getElementById("quality" + quality + "-button-caption").classList.add('active');
+}
+
+function redrawCanvas()
+{
+	renderer.update();
+	renderer.renderFrame(orbital, darkModeOn, renderMode, xCut, yCut, zCut, quality);
+	requestAnimationFrame(redrawCanvas);
+}
+
+function positionAtCenter(element, container)
+{
+	let rect = document.getElementById(container).getBoundingClientRect();
+	let el = document.getElementById(element);
+	let core = document.getElementById(element + "-core");
+
+	let elRect = el.getBoundingClientRect();
+	let coreRect = elRect;
+	if (core)
+		coreRect = core.getBoundingClientRect();
+
+	el.style.setProperty('left', rect.x + rect.width / 2.0 - elRect.width / 2.0 + "px");
+	el.style.setProperty('top', rect.y + rect.height / 2.0 - coreRect.height / 2.0 + "px");
+}
+
+function onPageResize(event)
+{
+	let rect = document.body.getBoundingClientRect();
+	canvas.width = rect.width;
+	canvas.height = rect.height;
+
+	// let panelWidth = rect.width - rect.height;
+	// uiPanel.style.width = `${panelWidth}px`;
+
+	renderer.camera.setBounds(- rect.width / rect.height, rect.width / rect.height, -1.0, 1.0);
+
+	positionAtCenter("cloud-button-caption", "cloud-button");
+	positionAtCenter("isosurface-button-caption", "isosurface-button");
+
+	positionAtCenter("x-button-caption", "x-button");
+	positionAtCenter("y-button-caption", "y-button");
+	positionAtCenter("z-button-caption", "z-button");
+
+	for (let i = 1; i <= 4; ++i)
+		positionAtCenter("quality" + i + "-button-caption", "quality" + i + "-button");
+
+	for (let i = 0; i < 30; ++i)
+		positionAtCenter("orbital" + i + "-button-caption", "orbital" + i + "-button");
+}
+
+function onPageLoaded()
+{
+	canvas = document.getElementById("webgl-canvas");
+	uiPanel = document.getElementById("ui-panel");
+
+	renderer = new OrbitalRenderer(canvas);
+	redrawCanvas();
+
+	toggleDarkMode();
+	setRenderMode("cloud");
+	setOrbital(0);
+	setQuality(1);
+
+	addEventListener("resize", onPageResize);
+	onPageResize();
+}
+
+</script>
+
+</head>
+
+<body onload="onPageLoaded();">
+	
+<canvas id="webgl-canvas"></canvas>
+
+<div id="ui-panel">
+
+<!-- <div style="padding: 25px"> -->
+<table style="margin: 25px; width: 100%">
+<tr>
+<td>
+
+<center>
+<table>
+<tr>
+
+<td>
+<div>
+<svg width="70" height="50" class="ui-button" onclick="toggleDarkMode();">
+<rect x="10" y="10" rx="10" ry="10" width="50" height="30" />
+<rect x="14" y="14" rx="6" ry="6" width="22" height="22" class="filled" id="theme-toggle-rect" />
+</svg>
+</div>
+</td>
+
+<td>
+<div>
+<svg width="180" height="50">
+<g class="ui-button" id="cloud-button" onclick="setRenderMode('cloud');">
+<path d="M70,10 v30 h-50 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h50" />
+</g>
+<g class="ui-button" id="isosurface-button" onclick="setRenderMode('isosurface');">
+<path d="M70,10 v30 h90 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-90" />
+</g>
+</svg>
+</div>
+</td>
+
+<td>
+<div>
+<svg width="110" height="50">
+<g class="ui-button" id="x-button" onclick="toggleXCut();">
+<path d="M40,10 v30 h-20 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h20" />
+</g>
+<g class="ui-button" id="y-button" onclick="toggleYCut();">
+<path d="M40,10 v30 h30 v-30 h-30" />
+</g>
+<g class="ui-button" id="z-button" onclick="toggleZCut();">
+<path d="M70,10 v30 h20 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-20" />
+</g>
+</svg>
+</div>
+</td>
+
+<td>
+<div>
+<svg width="180" height="50">
+<g class="ui-button" id="quality1-button" onclick="setQuality(1);">
+<path d="M50,10 v30 h-30 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h30" />
+</g>
+<g class="ui-button" id="quality2-button" onclick="setQuality(2);">
+<path d="M50,10 v30 h40 v-30 h-40" />
+</g>
+<g class="ui-button" id="quality3-button" onclick="setQuality(3);">
+<path d="M90,10 v30 h40 v-30 h-40" />
+</g>
+<g class="ui-button" id="quality4-button" onclick="setQuality(4);">
+<path d="M130,10 v30 h30 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-30" />
+</g>
+</svg>
+</div>
+</td>
+
+</tr>
+</table>
+</center>
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+<center>
+<table>
+<tr>
+<td>
+<div>
+<svg width="580" height="50">
+<!-- 1s -->
+<g class="ui-button" id="orbital0-button" onclick="setOrbital(0);">
+<path d="M50,10 v30 h-30 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h30" />
+</g>
+<!-- 2s -->
+<g class="ui-button" id="orbital1-button" onclick="setOrbital(1);">
+<path d="M50,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 2p-1 -->
+<g class="ui-button" id="orbital2-button" onclick="setOrbital(2);">
+<path d="M90,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 2p0 -->
+<g class="ui-button" id="orbital3-button" onclick="setOrbital(3);">
+<path d="M130,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 2p1 -->
+<g class="ui-button" id="orbital4-button" onclick="setOrbital(4);">
+<path d="M170,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3s -->
+<g class="ui-button" id="orbital5-button" onclick="setOrbital(5);">
+<path d="M210,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3p-1 -->
+<g class="ui-button" id="orbital6-button" onclick="setOrbital(6);">
+<path d="M250,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3p0 -->
+<g class="ui-button" id="orbital7-button" onclick="setOrbital(7);">
+<path d="M290,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3p1 -->
+<g class="ui-button" id="orbital8-button" onclick="setOrbital(8);">
+<path d="M330,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3d-2 -->
+<g class="ui-button" id="orbital9-button" onclick="setOrbital(9);">
+<path d="M370,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3d-1 -->
+<g class="ui-button" id="orbital10-button" onclick="setOrbital(10);">
+<path d="M410,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3d0 -->
+<g class="ui-button" id="orbital11-button" onclick="setOrbital(11);">
+<path d="M450,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3d1 -->
+<g class="ui-button" id="orbital12-button" onclick="setOrbital(12);">
+<path d="M490,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 3d2 -->
+<g class="ui-button" id="orbital13-button" onclick="setOrbital(13);">
+<path d="M530,10 v30 h30 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-30" />
+</g>
+</svg>
+</div>
+</td>
+</tr>
+</table>
+</center>
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+<center>
+<table>
+<tr>
+<td>
+<div>
+<svg width="660" height="50">
+<!-- 4s -->
+<g class="ui-button" id="orbital14-button" onclick="setOrbital(14);">
+<path d="M50,10 v30 h-30 a10,10,0,0,1,-10,-10 v-10 a10,10,0,0,1,10,-10 h30" />
+</g>
+<!-- 4p0 -->
+<g class="ui-button" id="orbital15-button" onclick="setOrbital(15);">
+<path d="M50,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4p1 -->
+<g class="ui-button" id="orbital16-button" onclick="setOrbital(16);">
+<path d="M90,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4p2 -->
+<g class="ui-button" id="orbital17-button" onclick="setOrbital(17);">
+<path d="M130,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4d-2 -->
+<g class="ui-button" id="orbital18-button" onclick="setOrbital(18);">
+<path d="M170,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4d-1 -->
+<g class="ui-button" id="orbital19-button" onclick="setOrbital(19);">
+<path d="M210,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4d0 -->
+<g class="ui-button" id="orbital20-button" onclick="setOrbital(20);">
+<path d="M250,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4d1 -->
+<g class="ui-button" id="orbital21-button" onclick="setOrbital(21);">
+<path d="M290,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4d2 -->
+<g class="ui-button" id="orbital22-button" onclick="setOrbital(22);">
+<path d="M330,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f0 -->
+<g class="ui-button" id="orbital23-button" onclick="setOrbital(23);">
+<path d="M370,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f1 -->
+<g class="ui-button" id="orbital24-button" onclick="setOrbital(24);">
+<path d="M410,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f2 -->
+<g class="ui-button" id="orbital25-button" onclick="setOrbital(25);">
+<path d="M450,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f3 -->
+<g class="ui-button" id="orbital26-button" onclick="setOrbital(26);">
+<path d="M490,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f4 -->
+<g class="ui-button" id="orbital27-button" onclick="setOrbital(27);">
+<path d="M530,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f5 -->
+<g class="ui-button" id="orbital28-button" onclick="setOrbital(28);">
+<path d="M570,10 v30 h40 v-30 h-40" />
+</g>
+<!-- 4f6 -->
+<g class="ui-button" id="orbital29-button" onclick="setOrbital(29);">
+<path d="M610,10 v30 h30 a10,10,0,0,0,10,-10 v-10 a10,10,0,0,0,-10,-10 h-30" />
+</g>
+</svg>
+</div>
+</td>
+</tr>
+</table>
+</center>
+
+</td>
+</tr>
+</table>
+
+</div>
+
+<span class="ui-button-caption" id="cloud-button-caption">Cloud</span>
+<span class="ui-button-caption" id="isosurface-button-caption">Isosurface</span>
+
+<span class="ui-button-caption" id="x-button-caption">X</span>
+<span class="ui-button-caption" id="y-button-caption">Y</span>
+<span class="ui-button-caption" id="z-button-caption">Z</span>
+
+<span class="ui-button-caption" id="quality1-button-caption">32</span>
+<span class="ui-button-caption" id="quality2-button-caption">64</span>
+<span class="ui-button-caption" id="quality3-button-caption">128</span>
+<span class="ui-button-caption" id="quality4-button-caption">256</span>
+
+<span class="ui-button-caption" id="orbital0-button-caption"><span id="orbital0-button-caption-core">1S</span><sub></sub></span>
+<span class="ui-button-caption" id="orbital1-button-caption"><span id="orbital1-button-caption-core">2S</span><sub></sub></span>
+<span class="ui-button-caption" id="orbital2-button-caption"><span id="orbital2-button-caption-core">2P</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital3-button-caption"><span id="orbital3-button-caption-core">2P</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital4-button-caption"><span id="orbital4-button-caption-core">2P</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital5-button-caption"><span id="orbital5-button-caption-core">3S</span><sub></sub></span>
+<span class="ui-button-caption" id="orbital6-button-caption"><span id="orbital6-button-caption-core">3P</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital7-button-caption"><span id="orbital7-button-caption-core">3P</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital8-button-caption"><span id="orbital8-button-caption-core">3P</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital9-button-caption"><span id="orbital9-button-caption-core">3D</span><sub>-2</sub></span>
+<span class="ui-button-caption" id="orbital10-button-caption"><span id="orbital10-button-caption-core">3D</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital11-button-caption"><span id="orbital11-button-caption-core">3D</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital12-button-caption"><span id="orbital12-button-caption-core">3D</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital13-button-caption"><span id="orbital13-button-caption-core">3D</span><sub>2</sub></span>
+<span class="ui-button-caption" id="orbital14-button-caption"><span id="orbital14-button-caption-core">4S</span><sub></sub></span>
+<span class="ui-button-caption" id="orbital15-button-caption"><span id="orbital15-button-caption-core">4P</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital16-button-caption"><span id="orbital16-button-caption-core">4P</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital17-button-caption"><span id="orbital17-button-caption-core">4P</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital18-button-caption"><span id="orbital18-button-caption-core">4D</span><sub>-2</sub></span>
+<span class="ui-button-caption" id="orbital19-button-caption"><span id="orbital19-button-caption-core">4D</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital20-button-caption"><span id="orbital20-button-caption-core">4D</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital21-button-caption"><span id="orbital21-button-caption-core">4D</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital22-button-caption"><span id="orbital22-button-caption-core">4D</span><sub>2</sub></span>
+<span class="ui-button-caption" id="orbital23-button-caption"><span id="orbital23-button-caption-core">4F</span><sub>-3</sub></span>
+<span class="ui-button-caption" id="orbital24-button-caption"><span id="orbital24-button-caption-core">4F</span><sub>-2</sub></span>
+<span class="ui-button-caption" id="orbital25-button-caption"><span id="orbital25-button-caption-core">4F</span><sub>-1</sub></span>
+<span class="ui-button-caption" id="orbital26-button-caption"><span id="orbital26-button-caption-core">4F</span><sub>0</sub></span>
+<span class="ui-button-caption" id="orbital27-button-caption"><span id="orbital27-button-caption-core">4F</span><sub>1</sub></span>
+<span class="ui-button-caption" id="orbital28-button-caption"><span id="orbital28-button-caption-core">4F</span><sub>2</sub></span>
+<span class="ui-button-caption" id="orbital29-button-caption"><span id="orbital29-button-caption-core">4F</span><sub>3</sub></span>
+
+<div style="position: fixed; left: 5px; bottom: 5px" class="faded">Made by <a href="https://lisyarus.github.io/blog">lisyarus</a></div>
+
+</body>
+
+</html>
