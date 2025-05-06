@@ -214,6 +214,8 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
     var totalForce = vec2f(0.0, 0.0);
 
+    // totalForce -= vec2f(particle.x, particle.y);
+
     for (var binX = binXMin; binX <= binXMax; binX += 1) {
         for (var binY = binYMin; binY <= binYMax; binY += 1) {
             let binIndex = binY * binInfo.gridSize.x + binX;
@@ -265,9 +267,6 @@ fn particleAdvance(@builtin(global_invocation_id) id : vec3u)
     }
 
     var particle = particles[id.x];
-
-    // particle.vx -= particle.x * simulationOptions.dt;
-    // particle.vy -= particle.y * simulationOptions.dt;
 
     particle.vx *= simulationOptions.friction;
     particle.vy *= simulationOptions.friction;
@@ -413,15 +412,16 @@ const speciesCount = 16;
 
 const particleCount = 65536;
 const simulationBox = [[-800, 800], [-450, 450]];
+// const simulationBox = [[-400, 400], [-225, 225]];
 
 const maxForceRadius = 32.0;
+const maxForceStrength = 100.0;
 const initialVelocity = 10.0;
+const friction = 10.0;
 
 const gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
 const binCount = gridSize[0] * gridSize[1];
 const prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
-
-const friction = 10.0;
 
 var speciesBuffer;
 var forcesBuffer;
@@ -669,7 +669,7 @@ async function init()
     {
         for (var j = 0; j < speciesCount; ++j)
         {
-            forces[3 * (i * speciesCount + j) + 0] = (20.0 + 80.0 * Math.random()) * (Math.random() < 0.5 ? 1.0 : -1.0);
+            forces[3 * (i * speciesCount + j) + 0] = maxForceStrength * (0.25 + 0.75 * Math.random()) * (Math.random() < 0.5 ? 1.0 : -1.0);
             forces[3 * (i * speciesCount + j) + 1] = Math.random() * maxForceRadius;
             forces[3 * (i * speciesCount + j) + 2] = Math.random() * 0.5 * forces[3 * (i * speciesCount + j) + 1];
         }
@@ -1298,6 +1298,9 @@ async function init()
 
 function resize()
 {
+    if (!canvas)
+        return;
+    
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
