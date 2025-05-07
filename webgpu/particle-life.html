@@ -1309,8 +1309,33 @@ window.onload = init;
 window.onresize = resize;
 
         </script>
+        <style>
+            #mainCanvas {
+                position: fixed;
+            }
+
+            #copyright {
+                position: fixed;
+                left: 12px;
+                bottom: 12px;
+                color: #bbb;
+                font-family: monospace;
+                font-size: 14;
+            }
+
+            a {
+                color: #bbb;
+                text-decoration: none;
+            }
+
+            a:hover {
+                color: #eee;
+                text-decoration: underline;
+            }
+        </style>
     </head>
     <body>
         <canvas id="mainCanvas"></canvas>
+        <div id="copyright">by <a href="https://lisyarus.github.io/blog">@lisyarus</a></div>
     </body>
 </html>
