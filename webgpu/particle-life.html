@@ -692,6 +692,29 @@ async function init()
     
     device.queue.writeBuffer(forcesBuffer, 0, forces);
 
+    var systemInfo = {
+        species: [],
+    };
+
+    for (var i = 0; i < speciesCount; ++i)
+    {
+        systemInfo.species[i] = {
+            color: [species[4 * i + 0], species[4 * i + 1], species[4 * i + 2], species[4 * i + 3]],
+            forces: [],
+        };
+
+        for (var j = 0; j < speciesCount; ++j)
+        {
+            systemInfo.species[i].forces[j] = {
+                strength: forces[3 * (i * speciesCount + j) + 0],
+                radius: forces[3 * (i * speciesCount + j) + 1],
+                collisionRadius: forces[3 * (i * speciesCount + j) + 2],
+            };
+        }
+    }
+
+    console.log(JSON.stringify(systemInfo));
+
     const initialParticles = new Float32Array(particleCount * 5);
 
     for (var i = 0; i < particleCount; ++i)
