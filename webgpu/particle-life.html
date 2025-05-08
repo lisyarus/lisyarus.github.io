@@ -476,6 +476,8 @@ var lastFrameTimestamp = 0.0;
 
 var mouseDrag = null;
 
+const activeTouches = new Map();
+
 var frameID = 0;
 
 var paused = false;
@@ -598,7 +600,7 @@ async function init()
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    this.canvas.addEventListener('wheel',function(event) {
+    canvas.addEventListener('wheel', function(event) {
         const factor = Math.pow(1.25, event.deltaY / 120);
         cameraExtentXTarget *= factor;
 
@@ -610,28 +612,92 @@ async function init()
         event.preventDefault();
     }, false);    
 
-    this.canvas.addEventListener('mousedown',function(event) {
+    canvas.addEventListener('mousedown', function(event) {
         mouseDrag = [event.clientX, event.clientY];
         event.preventDefault();
     }, false);
 
-    this.canvas.addEventListener('mouseup',function(event) {
+    canvas.addEventListener('mouseup', function(event) {
         mouseDrag = null;
         event.preventDefault();
     }, false);
 
-    this.canvas.addEventListener('mousemove',function(event) {
+    canvas.addEventListener('mousemove', function(event) {
         if (mouseDrag) {
-            const deltaX = event.clientX - mouseDrag[0];
-            const deltaY = event.clientY - mouseDrag[1];
+            const delta = [event.clientX - mouseDrag[0], event.clientY - mouseDrag[1]];
 
-            cameraCenter[0] -= deltaX / canvas.width * cameraExtentX * 2.0;
-            cameraCenter[1] += deltaY / canvas.height * cameraExtentY * 2.0;
+            cameraCenter[0] -= delta[0] / canvas.width * cameraExtentX * 2.0;
+            cameraCenter[1] += delta[1] / canvas.height * cameraExtentY * 2.0;
 
             mouseDrag = [event.clientX, event.clientY];
         }
         event.preventDefault();
     }, false);
+
+    canvas.addEventListener("touchstart", function(event) {
+        for (const touch of event.changedTouches) {
+            activeTouches.set(touch.identifier, [touch.pageX, touch.pageY]);
+        }
+        event.preventDefault();
+    });
+
+    canvas.addEventListener("touchmove", function(event) {
+        const oldTouches = new Map(activeTouches);
+
+        for (const touch of event.changedTouches) {
+            activeTouches.set(touch.identifier, [touch.pageX, touch.pageY]);
+        }
+
+        if (oldTouches.size == 1 && activeTouches.size == 1) {
+            const oldPosition = oldTouches.entries().next().value[1];
+            const newPosition = activeTouches.entries().next().value[1];
+            const delta = [newPosition[0] - oldPosition[0], newPosition[1] - oldPosition[1]];
+
+            cameraCenter[0] -= delta[0] / canvas.width * cameraExtentX * 2.0;
+            cameraCenter[1] += delta[1] / canvas.height * cameraExtentY * 2.0;
+        }
+
+        if (oldTouches.size == 2 && activeTouches.size == 2) {
+            const oldIterator = oldTouches.entries();
+            const newIterator = activeTouches.entries();
+
+            const oldPosition1 = oldIterator.next().value[1];
+            const oldPosition2 = oldIterator.next().value[1];
+
+            const newPosition1 = newIterator.next().value[1];
+            const newPosition2 = newIterator.next().value[1];
+
+            const oldCenter = [(oldPosition2[0] + oldPosition1[0]) / 2, (oldPosition2[1] + oldPosition1[1]) / 2];
+            const newCenter = [(newPosition2[0] + newPosition1[0]) / 2, (newPosition2[1] + newPosition1[1]) / 2];
+
+            const delta = [newCenter[0] - oldCenter[0], newCenter[1] - oldCenter[1]];
+
+            const oldDelta = [oldPosition2[0] - oldPosition1[0], oldPosition2[1] - oldPosition1[1]];
+            const newDelta = [newPosition2[0] - newPosition1[0], newPosition2[1] - newPosition1[1]];
+
+            const oldDistance = Math.sqrt(oldDelta[0] * oldDelta[0] + oldDelta[1] * oldDelta[1]);
+            const newDistance = Math.sqrt(newDelta[0] * newDelta[0] + newDelta[1] * newDelta[1]);
+
+            cameraCenter[0] -= delta[0] / canvas.width * cameraExtentX * 2.0;
+            cameraCenter[1] += delta[1] / canvas.height * cameraExtentY * 2.0;
+            cameraExtentXTarget *= oldDistance / newDistance;
+        }
+
+        event.preventDefault();
+    });
+
+    canvas.addEventListener("touchend", function(event) {
+        for (const touch of event.changedTouches) {
+            activeTouches.delete(touch.identifier);
+        }
+        event.preventDefault();
+    });
+
+    canvas.addEventListener("touchcancel", function(event) {
+        for (const touch of event.changedTouches) {
+            activeTouches.delete(touch.identifier);
+        }
+    });
 
     window.addEventListener('keydown',function(event) {
         if (event.key == ' ') {
