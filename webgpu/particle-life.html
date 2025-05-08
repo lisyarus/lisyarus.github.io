@@ -350,7 +350,7 @@ fn vertexGlow(@builtin(vertex_index) id : u32) -> CircleVertexOut
 {
     let particle = particles[id / 6u];
     let offset = offsets[id % 6u];
-    let position = vec2f(particle.x, particle.y) + 8.0 * offset;
+    let position = vec2f(particle.x, particle.y) + 12.0 * offset;
     return CircleVertexOut(
         vec4f((position - camera.center) / camera.extent, 0.0, 1.0),
         offset,
@@ -362,7 +362,7 @@ fn vertexGlow(@builtin(vertex_index) id : u32) -> CircleVertexOut
 fn fragmentGlow(in : CircleVertexOut) -> @location(0) vec4f
 {
     let l = length(in.offset);
-    let alpha = smoothstep(1.0, 0.0, l) / 16.0;
+    let alpha = exp(- 6.0 * l * l) / 64.0;
     return in.color * vec4f(1.0, 1.0, 1.0, alpha);
 }
 
@@ -412,10 +412,60 @@ fn fragmentPoint(in : CircleVertexOut) -> @location(0) vec4f
 }
 `;
 
+const composeShader =
+`
+@group(0) @binding(0) var hdrTexture : texture_2d<f32>;
+
+const vertices = array<vec2f, 3>(
+    vec2f(-1.0, -1.0),
+    vec2f( 3.0, -1.0),
+    vec2f(-1.0,  3.0),
+);
+
+struct VertexOut
+{
+    @builtin(position) position : vec4f,
+    @location(0) texcoord : vec2f,
+}
+
+@vertex
+fn vertexMain(@builtin(vertex_index) id : u32) -> VertexOut
+{
+    let vertex = vertices[id];
+    return VertexOut(
+        vec4f(vertex, 0.0, 1.0),
+        vertex * 0.5 + vec2f(0.5)
+    );
+}
+
+fn acesTonemap(x : vec3f) -> vec3f
+{
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3f(0.0), vec3f(1.0));
+}
+
+@fragment
+fn fragmentMain(in : VertexOut) -> @location(0) vec4f
+{
+    var color = textureLoad(hdrTexture, vec2i(in.position.xy), 0).rgb;
+
+    color = acesTonemap(color);
+    color = pow(color, vec3f(1.0 / 2.2));
+
+    return vec4f(color, 1.0);
+}
+`;
+
 var canvas;
 var context;
 var surfaceFormat;
 var device;
+
+const hdrFormat = 'rgba16float';
 
 const maxForceRadius = 32.0;
 const maxForceStrength = 100.0;
@@ -441,6 +491,9 @@ var binPrefixSumStepSizeBuffer;
 var cameraBuffer;
 var simulationOptionsBuffer;
 
+var hdrTexture;
+var hdrTextureView;
+
 var particleBufferBindGroupLayout;
 var particleBufferReadOnlyBindGroupLayout;
 var cameraBindGroupLayout;
@@ -449,6 +502,7 @@ var binFillSizeBindGroupLayout;
 var binPrefixSumBindGroupLayout;
 var particleSortBindGroupLayout;
 var particleComputeForcesBindGroupLayout;
+var hdrTextureBindGroupLayout;
 
 var particleBufferBindGroup;
 var particleBufferReadOnlyBindGroup;
@@ -458,6 +512,7 @@ var particleSortBindGroup;
 var particleComputeForcesBindGroup;
 var cameraBindGroup;
 var simulationOptionsBindGroup;
+var hdrTextureBindGroup;
 
 var binClearSizePipeline;
 var binFillSizePipeline;
@@ -469,6 +524,7 @@ var particleAdvancePipeline;
 var particleRenderGlowPipeline;
 var particleRenderPipeline;
 var particleRenderPointPipeline;
+var composePipeline;
 
 var cameraCenter = [0.0, 0.0];
 var cameraExtentX = simulationBox[0][1];
@@ -562,28 +618,43 @@ function redraw()
         computePass.end();
     }
  
-    const renderPass = encoder.beginRenderPass({
+    const hdrRenderPass = encoder.beginRenderPass({
         colorAttachments: [
             {
-                view: context.getCurrentTexture().createView(),
-                clearValue: [0.05, 0.05, 0.05, 1],
+                view: hdrTextureView,
+                clearValue: [0.001, 0.001, 0.001, 1],
                 loadOp: 'clear',
                 storeOp: 'store',
             },
         ],
     });
-    renderPass.setBindGroup(0, particleBufferReadOnlyBindGroup);
-    renderPass.setBindGroup(1, cameraBindGroup);
-    renderPass.setPipeline(particleRenderGlowPipeline);
-    renderPass.draw(particleCount * 6);
+    hdrRenderPass.setBindGroup(0, particleBufferReadOnlyBindGroup);
+    hdrRenderPass.setBindGroup(1, cameraBindGroup);
+    hdrRenderPass.setPipeline(particleRenderGlowPipeline);
+    hdrRenderPass.draw(particleCount * 6);
     if (pixelsPerUnit < 2.0) {
-        renderPass.setPipeline(particleRenderPointPipeline);
-        renderPass.draw(particleCount * 6);
+        hdrRenderPass.setPipeline(particleRenderPointPipeline);
+        hdrRenderPass.draw(particleCount * 6);
     } else {
-        renderPass.setPipeline(particleRenderPipeline);
-        renderPass.draw(particleCount * 6);
+        hdrRenderPass.setPipeline(particleRenderPipeline);
+        hdrRenderPass.draw(particleCount * 6);
     }
-    renderPass.end();
+    hdrRenderPass.end();
+ 
+    const composeRenderPass = encoder.beginRenderPass({
+        colorAttachments: [
+            {
+                view: context.getCurrentTexture().createView(),
+                clearValue: [0, 0, 0, 0],
+                loadOp: 'clear',
+                storeOp: 'store',
+            },
+        ],
+    });
+    composeRenderPass.setBindGroup(0, hdrTextureBindGroup);
+    composeRenderPass.setPipeline(composePipeline);
+    composeRenderPass.draw(3);
+    composeRenderPass.end();
  
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
@@ -927,11 +998,36 @@ function initialSystem()
     return randomizeSystem(systemDescription);
 }
 
+function resize()
+{
+    if (!canvas)
+        return;
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    hdrTexture = device.createTexture({
+        format: hdrFormat,
+        size: [canvas.width, canvas.height, 1],
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    hdrTextureView = hdrTexture.createView({});
+
+    hdrTextureBindGroup = device.createBindGroup({
+        layout: hdrTextureBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: hdrTextureView,
+            },
+        ],
+    });
+}
+
 async function init()
 {
     canvas = document.getElementById("mainCanvas");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 
     canvas.addEventListener('wheel', function(event) {
         const factor = Math.pow(1.25, event.deltaY / 120);
@@ -1124,6 +1220,10 @@ async function init()
         code: particleRenderShader,
     });
 
+    const composeShaderModule = device.createShaderModule({
+        code: composeShader,
+    });
+
     particleBufferBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
@@ -1308,6 +1408,16 @@ async function init()
         ],
     });
 
+    hdrTextureBindGroupLayout = device.createBindGroupLayout({
+        entries: [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            },
+        ],
+    });
+
     binClearSizePipeline = device.createComputePipeline({
         layout: device.createPipelineLayout({
             bindGroupLayouts: [
@@ -1419,15 +1529,15 @@ async function init()
             entryPoint: 'fragmentGlow',
             targets: [
                 {
-                    format: surfaceFormat,
+                    format: hdrFormat,
                     blend: {
                         color: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                         alpha: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                     },
                 },
@@ -1454,15 +1564,15 @@ async function init()
             entryPoint: 'fragmentCircle',
             targets: [
                 {
-                    format: surfaceFormat,
+                    format: hdrFormat,
                     blend: {
                         color: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                         alpha: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                     },
                 },
@@ -1489,15 +1599,15 @@ async function init()
             entryPoint: 'fragmentPoint',
             targets: [
                 {
-                    format: surfaceFormat,
+                    format: hdrFormat,
                     blend: {
                         color: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                         alpha: {
                             srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
+                            dstFactor: 'one',
                         },
                     },
                 },
@@ -1505,18 +1615,35 @@ async function init()
         }
     });
 
+    composePipeline = device.createRenderPipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [
+                hdrTextureBindGroupLayout,
+            ],
+        }),
+        vertex: {
+            module: composeShaderModule,
+            entryPoint: 'vertexMain',
+        },
+        primitive: {
+            topology: 'triangle-list',
+        },
+        fragment: {
+            module: composeShaderModule,
+            entryPoint: 'fragmentMain',
+            targets: [
+                {
+                    format: surfaceFormat,
+                },
+            ],
+        }
+    });
+
+    resize();
+
     loadSystem(initialSystem());
 
     redraw();
-}
-
-function resize()
-{
-    if (!canvas)
-        return;
-    
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 }
 
 window.onload = init;
