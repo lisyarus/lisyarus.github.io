@@ -413,6 +413,7 @@ fn fragmentPoint(in : CircleVertexOut) -> @location(0) vec4f
 const composeShader =
 `
 @group(0) @binding(0) var hdrTexture : texture_2d<f32>;
+@group(0) @binding(1) var blueNoiseTexture : texture_2d<f32>;
 
 const vertices = array<vec2f, 3>(
     vec2f(-1.0, -1.0),
@@ -446,13 +447,30 @@ fn acesTonemap(x : vec3f) -> vec3f
     return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3f(0.0), vec3f(1.0));
 }
 
+fn dither(x : vec3f, n : f32) -> vec3f
+{
+    let c = x * 255.0;
+    let c0 = floor(c);
+    let c1 = c0 + vec3f(1.0);
+    let dc = c - c0;
+
+    var r = c0;
+    if (dc.r > n) { r.r = c1.r; }
+    if (dc.g > n) { r.g = c1.g; }
+    if (dc.b > n) { r.b = c1.b; }
+
+    return r / 255.0;
+}
+
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
     var color = textureLoad(hdrTexture, vec2i(in.position.xy), 0).rgb;
+    let noise = textureLoad(blueNoiseTexture, vec2u(in.position.xy) % textureDimensions(blueNoiseTexture), 0).r;
 
     color = acesTonemap(color);
     color = pow(color, vec3f(1.0 / 2.2));
+    color = dither(color, noise);
 
     return vec4f(color, 1.0);
 }
@@ -489,6 +507,8 @@ var binPrefixSumStepSizeBuffer;
 var cameraBuffer;
 var simulationOptionsBuffer;
 
+var blueNoiseTexture;
+var blueNoiseTextureView;
 var hdrTexture;
 var hdrTextureView;
 
@@ -500,7 +520,7 @@ var binFillSizeBindGroupLayout;
 var binPrefixSumBindGroupLayout;
 var particleSortBindGroupLayout;
 var particleComputeForcesBindGroupLayout;
-var hdrTextureBindGroupLayout;
+var composeBindGroupLayout;
 
 var particleBufferBindGroup;
 var particleBufferReadOnlyBindGroup;
@@ -510,7 +530,7 @@ var particleSortBindGroup;
 var particleComputeForcesBindGroup;
 var cameraBindGroup;
 var simulationOptionsBindGroup;
-var hdrTextureBindGroup;
+var composeBindGroup;
 
 var binClearSizePipeline;
 var binFillSizePipeline;
@@ -649,7 +669,7 @@ function redraw()
             },
         ],
     });
-    composeRenderPass.setBindGroup(0, hdrTextureBindGroup);
+    composeRenderPass.setBindGroup(0, composeBindGroup);
     composeRenderPass.setPipeline(composePipeline);
     composeRenderPass.draw(3);
     composeRenderPass.end();
@@ -1012,15 +1032,25 @@ function resize()
 
     hdrTextureView = hdrTexture.createView({});
 
-    hdrTextureBindGroup = device.createBindGroup({
-        layout: hdrTextureBindGroupLayout,
+    composeBindGroup = device.createBindGroup({
+        layout: composeBindGroupLayout,
         entries: [
             {
                 binding: 0,
                 resource: hdrTextureView,
             },
+            {
+                binding: 1,
+                resource: blueNoiseTextureView,
+            },
         ],
     });
+}
+
+async function loadImage(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await createImageBitmap(blob, { colorSpaceConversion: 'none' });
 }
 
 async function init()
@@ -1406,10 +1436,15 @@ async function init()
         ],
     });
 
-    hdrTextureBindGroupLayout = device.createBindGroupLayout({
+    composeBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            },
+            {
+                binding: 1,
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {},
             },
@@ -1616,7 +1651,7 @@ async function init()
     composePipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({
             bindGroupLayouts: [
-                hdrTextureBindGroupLayout,
+                composeBindGroupLayout,
             ],
         }),
         vertex: {
@@ -1636,6 +1671,20 @@ async function init()
             ],
         }
     });
+
+    const blueNoiseImage = await loadImage("/webgpu/blue-noise.png");
+    blueNoiseTexture = device.createTexture({
+        format: 'rgba8unorm-srgb',
+        size: [blueNoiseImage.width, blueNoiseImage.height],
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+        {source: blueNoiseImage},
+        {texture: blueNoiseTexture},
+        {width: blueNoiseImage.width, height: blueNoiseImage.height},
+    );
+
+    blueNoiseTextureView = blueNoiseTexture.createView({});
 
     resize();
 
