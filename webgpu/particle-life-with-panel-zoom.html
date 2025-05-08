@@ -1,0 +1,393 @@
+
+<!--
+Copyright (c) 2025 Nikita Lisitsa (Original)
+Modifications for control panel, zoom, palettes, particle size by AI (Claude).
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-->
+
+<html lang="en-US">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta property="og:title" content="Particle Life 2D">
+        <meta property="og:site_name" content="lisyarus blog">
+        <meta property="og:image" content="/webgpu/particle-life-cover.png" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:width" content="1200" />
+        <title>Particle Life 2D</title>
+        <link rel="icon" type="image/x-icon" href="/blog/assets/favicon.ico">
+        <style>
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden;
+            }
+
+            #mainCanvas {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+
+            #copyright {
+                position: fixed;
+                left: 12px;
+                bottom: 12px;
+                color: #bbb;
+                font-family: monospace;
+                font-size: 14px;
+                z-index: 1000;
+            }
+
+            a { color: #bbb; text-decoration: none; }
+            a:hover { color: #eee; text-decoration: underline; }
+
+            /* Control Panel Styles */
+            #controlPanelContainer {
+                position: fixed;
+                top: 10px;
+                right: 10px; /* Initial position */
+                z-index: 1001;
+                display: flex;
+                align-items: flex-start;
+                transition: transform 0.3s ease-in-out; /* For sliding */
+            }
+
+            #controlPanelContainer.panel-hidden {
+                /* Slides the container so only the button (approx 44px) is visible */
+                /* Adjust 44px if button width/padding changes significantly */
+                transform: translateX(calc(100% - 44px)); 
+            }
+
+            #toggleControlsButton {
+                background-color: rgba(70, 70, 70, 0.9);
+                color: white;
+                border: none;
+                padding: 10px 12px;
+                font-size: 18px;
+                cursor: pointer;
+                border-radius: 5px 0 0 5px; /* Default for open panel */
+                margin-right: -1px; 
+                height: 40px; 
+                line-height: 20px; 
+                flex-shrink: 0; /* Prevent button from shrinking */
+            }
+            
+            #controlPanel {
+                background-color: rgba(50, 50, 50, 0.85);
+                padding: 15px;
+                border-radius: 0 8px 8px 0; /* Right corners rounded */
+                box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+                color: white;
+                font-family: sans-serif;
+                width: 280px;
+                /* No transform needed here, parent container handles sliding */
+            }
+
+            #controlPanel .control-row {
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+            }
+            
+            #controlPanel .control-row label {
+                min-width: 90px; 
+                margin-right: 10px;
+                font-size: 14px;
+            }
+
+            #controlPanel .control-row input[type="range"],
+            #controlPanel .control-row select {
+                flex-grow: 1;
+                margin-right: 10px;
+            }
+            
+            #controlPanel .control-row .value-display {
+                min-width: 35px; /* Adjusted for potentially larger numbers */
+                font-size: 13px;
+                text-align: right;
+            }
+
+            #controlPanel .button-row {
+                margin-top:15px;
+                display: flex;
+                justify-content: space-around;
+            }
+
+            #controlPanel button {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 4px;
+                transition: background-color 0.2s;
+            }
+            #controlPanel button:hover { background-color: #0056b3; }
+        </style>
+        <script>
+
+const particleDescription = `struct Particle { x:f32, y:f32, vx:f32, vy:f32, species:f32, }`;
+const speciesDescription = `struct Species { color:vec4f, }`;
+const forceDescription = `struct Force { strength:f32, radius:f32, collisionRadius:f32, }`;
+
+const simulationOptionsDescription =
+`
+struct SimulationOptions
+{
+    left : f32,
+    right : f32,
+    bottom : f32,
+    top : f32,
+    frictionFactor : f32, 
+    dt : f32,
+    binSize : f32,
+    speciesCount : f32,
+    forceScale : f32, 
+    particleSize: f32, // New
+}
+
+struct BinInfo { gridSize:vec2i, binId:vec2i, binIndex:i32, }
+fn getBinInfo(position:vec2f, simOpts:SimulationOptions) -> BinInfo {
+    let gs = vec2i( i32(ceil((simOpts.right-simOpts.left)/simOpts.binSize)), i32(ceil((simOpts.top-simOpts.bottom)/simOpts.binSize)) );
+    let bid = vec2i( clamp(i32(floor((position.x-simOpts.left)/simOpts.binSize)),0,gs.x-1), clamp(i32(floor((position.y-simOpts.bottom)/simOpts.binSize)),0,gs.y-1) );
+    return BinInfo(gs, bid, bid.y*gs.x+bid.x);
+}`;
+
+const binFillSizeShader = `
+${particleDescription}${simulationOptionsDescription}
+@group(0)@binding(0)var<storage,read>P:array<Particle>;@group(1)@binding(0)var<uniform>S:SimulationOptions;@group(2)@binding(0)var<storage,read_write>B:array<atomic<u32>>;
+@compute @workgroup_size(64)fn clear(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&B)){return;}atomicStore(&B[id.x],0u);}
+@compute @workgroup_size(64)fn fill(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&P)){return;}let p=P[id.x];let bi=getBinInfo(vec2f(p.x,p.y),S).binIndex;atomicAdd(&B[bi+1],1u);}`;
+
+const binPrefixSumShader = `@group(0)@binding(0)var<storage,read>s:array<u32>;@group(0)@binding(1)var<storage,read_write>d:array<u32>;@group(0)@binding(2)var<uniform>z:u32;
+@compute @workgroup_size(64)fn step(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&s)){return;}if(id.x<z){d[id.x]=s[id.x];}else{d[id.x]=s[id.x-z]+s[id.x];}}`;
+
+const particleSortShader = `
+${particleDescription}${simulationOptionsDescription}
+@group(0)@binding(0)var<storage,read>s:array<Particle>;@group(0)@binding(1)var<storage,read_write>d:array<Particle>;
+@group(0)@binding(2)var<storage,read>o:array<u32>;@group(0)@binding(3)var<storage,read_write>b:array<atomic<u32>>;@group(1)@binding(0)var<uniform>S:SimulationOptions;
+@compute @workgroup_size(64)fn clear(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&b)){return;}atomicStore(&b[id.x],0u);}
+@compute @workgroup_size(64)fn sort(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&s)){return;}let p=s[id.x];let bi=getBinInfo(vec2f(p.x,p.y),S).binIndex;let ni=o[bi]+atomicAdd(&b[bi],1);d[ni]=p;}`;
+
+const particleComputeForcesShader = `
+${particleDescription}${forceDescription}${simulationOptionsDescription}
+@group(0)@binding(0)var<storage,read_write>P:array<Particle>;@group(0)@binding(1)var<storage,read>O:array<u32>;
+@group(0)@binding(2)var<storage,read>F:array<Force>;@group(1)@binding(0)var<uniform>S:SimulationOptions;
+@compute @workgroup_size(64)fn compute(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&P)){return;}var p=P[id.x];let sp=u32(p.species);let bi=getBinInfo(vec2f(p.x,p.y),S);
+let x0=max(0,bi.binId.x-1);let y0=max(0,bi.binId.y-1);let x1=min(bi.gridSize.x-1,bi.binId.x+1);let y1=min(bi.gridSize.y-1,bi.binId.y+1);var tf=vec2f(0,0);
+for(var bx=x0;bx<=x1;bx+=1){for(var by=y0;by<=y1;by+=1){let bidx=by*bi.gridSize.x+bx;let bs=O[bidx];let be=O[bidx+1];
+for(var j=bs;j<be;j+=1){if(j==id.x){continue;}let o=P[j];let os=u32(o.species);let f=F[sp*u32(S.speciesCount)+os];let str=f.strength*S.forceScale;
+let r=vec2f(o.x,o.y)-vec2f(p.x,p.y);let d=length(r);if(d==0.0){continue;}let n=r/d;
+tf+=str*max(0.0,1.0-d/f.radius)*n;tf-=10.0*abs(str)*max(0.0,1.0-d/f.collisionRadius)*n;}}}
+p.vx+=tf.x*S.dt;p.vy+=tf.y*S.dt;P[id.x]=p;}`;
+
+const particleAdvanceShader = `
+${particleDescription}${simulationOptionsDescription}
+@group(0)@binding(0)var<storage,read_write>P:array<Particle>;@group(1)@binding(0)var<uniform>S:SimulationOptions;
+@compute @workgroup_size(64)fn advance(@builtin(global_invocation_id)id:vec3u){if(id.x>=arrayLength(&P)){return;}var p=P[id.x];
+p.vx*=S.frictionFactor;p.vy*=S.frictionFactor;p.x+=p.vx*S.dt;p.y+=p.vy*S.dt;
+if(p.x<S.left){p.x=S.left;p.vx*=-1;}if(p.x>S.right){p.x=S.right;p.vx*=-1;}
+if(p.y<S.bottom){p.y=S.bottom;p.vy*=-1;}if(p.y>S.top){p.y=S.top;p.vy*=-1;}P[id.x]=p;}`;
+
+const particleRenderShader = `
+${particleDescription}${speciesDescription}${simulationOptionsDescription}
+struct Cam{center:vec2f,extent:vec2f,}
+@group(0)@binding(0)var<storage,read>P:array<Particle>;@group(0)@binding(1)var<storage,read>S:array<Species>;
+@group(1)@binding(0)var<uniform>C:Cam;@group(1)@binding(1)var<uniform>SO:SimulationOptions; // Added SimulationOptions for particleSize
+struct VOut{ @builtin(position)pos:vec4f,@location(0)off:vec2f,@location(1)col:vec4f,}
+const offs=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));
+@vertex fn vsGlow(@builtin(vertex_index)id:u32)->VOut{let p=P[id/6u];let o=offs[id%6u];
+let r=8.0*SO.particleSize;let pos=vec2f(p.x,p.y)+r*o;return VOut(vec4f((pos-C.center)/C.extent,0,1),o,S[u32(p.species)].color);}
+@fragment fn fsGlow(i:VOut)->@location(0)vec4f{let l=length(i.off);let a=smoothstep(1,0,l)/16.0;return i.col*vec4f(1,1,1,a);}
+@vertex fn vsCircle(@builtin(vertex_index)id:u32)->VOut{let p=P[id/6u];let o=offs[id%6u];
+let r=SO.particleSize;let pos=vec2f(p.x,p.y)+r*o;return VOut(vec4f((pos-C.center)/C.extent,0,1),o,S[u32(p.species)].color);}
+@fragment fn fsCircle(i:VOut)->@location(0)vec4f{let l=length(i.off);let e=fwidth(l);let a=smoothstep(1,1-e,l);return i.col*vec4f(1,1,1,a);}
+struct POut{ @builtin(position)pos:vec4f,@location(1)col:vec4f,}
+@vertex fn vsPoint(@builtin(vertex_index)id:u32)->POut{let p=P[id];let pos=vec2f(p.x,p.y);
+return POut(vec4f((pos-C.center)/C.extent,0,1),S[u32(p.species)].color);}
+@fragment fn fsPoint(i:POut)->@location(0)vec4f{return i.col;}`;
+
+var canvas, context, surfaceFormat, device;
+const speciesCount = 2 + Math.floor(Math.random() * 14);
+const particleCount = 65536;
+const simulationBox = [[-800, 800], [-450, 450]];
+const maxForceRadius = 32.0, maxForceStrength = 100.0, initialVelocity = 10.0;
+
+var currentFriction = 10.0, currentForceScale = 1.0, currentParticleSize = 1.0;
+
+function generateFromFixed(fixed, count) {
+    const c = new Float32Array(count*4);
+    for(let i=0;i<count;++i){let f=fixed[i%fixed.length];c[4*i]=f[0];c[4*i+1]=f[1];c[4*i+2]=f[2];c[4*i+3]=f[3];}
+    return c;
+}
+const palettes = [
+    {name:"Random Bright",gen:(n)=>{const c=new Float32Array(n*4);for(let i=0;i<n;++i){c[4*i]=.25+Math.random()*.75;c[4*i+1]=.25+Math.random()*.75;c[4*i+2]=.25+Math.random()*.75;c[4*i+3]=1;}return c;}},
+    {name:"Fiery Reds",fixed:[[1,.2,.1,1],[1,.4,.1,1],[.9,.1,0,1],[1,.6,.2,1],[.8,.3,.1,1],[1,.5,0,1],[.9,.25,.05,1],[1,.35,.15,1],[.95,.15,.02,1],[1,.55,.25,1],[.85,.35,.12,1],[1,.45,.05,1],[1,.3,.2,1],[.8,.2,0,1],[1,.1,.1,1]],gen:function(n){return generateFromFixed(this.fixed,n);}},
+    {name:"Ocean Blues",fixed:[[.1,.2,1,1],[.1,.4,1,1],[0,.1,.9,1],[.2,.6,1,1],[.1,.3,.8,1],[0,.5,1,1],[.15,.25,.95,1],[.15,.45,.95,1],[.05,.15,.85,1],[.25,.65,.95,1],[.15,.35,.75,1],[.05,.55,.95,1],[.2,.3,.9,1],[0,.2,.7,1],[.1,.1,1,1]],gen:function(n){return generateFromFixed(this.fixed,n);}},
+    {name:"Grayscale",gen:(n)=>{const c=new Float32Array(n*4);for(let i=0;i<n;++i){const g=.2+Math.random()*.8;c[4*i]=g;c[4*i+1]=g;c[4*i+2]=g;c[4*i+3]=1;}return c;}},
+    {name:"Synthwave Sunset",fixed:[[1,.3,.5,1],[1,.5,.3,1],[.6,.2,.8,1],[.3,.1,.6,1],[1,.7,.2,1],[.9,.4,.7,1],[.2,.2,.5,1]],gen:function(n){return generateFromFixed(this.fixed,n);}},
+    {name:"Emerald Forest",fixed:[[.1,.5,.2,1],[.2,.6,.3,1],[0,.4,.1,1],[.3,.5,.1,1],[.4,.3,.1,1],[.1,.7,.4,1],[.2,.4,.2,1]],gen:function(n){return generateFromFixed(this.fixed,n);}},
+    {name:"Cosmic Lilac",fixed:[[.6,.4,.8,1],[.7,.5,.9,1],[.5,.3,.7,1],[.4,.2,.6,1],[.8,.3,.8,1],[.5,.2,.9,1],[.7,.3,.6,1]],gen:function(n){return generateFromFixed(this.fixed,n);}},
+];
+let currentPaletteIndex = 0;
+
+const gridSize = [Math.ceil((simulationBox[0][1]-simulationBox[0][0])/maxForceRadius),Math.ceil((simulationBox[1][1]-simulationBox[1][0])/maxForceRadius)];
+const binCount = gridSize[0]*gridSize[1];
+const prefixSumIterations = Math.ceil(Math.log2(binCount+1)/2)*2; // Rounded up to multiple of 2
+
+var sBuf,fBuf,pBuf,ptBuf,boBuf,botBuf,bpsBuf,camBuf,simOptBuf;
+var pBBG,pBROBG,bfsBG,bpsBG=[null,null],psBG,pcfBG,camBG,soBG;
+var bcsp,bfsp,bpsPipe,pscPipe,psPipe,pcfPipe,paPipe,prgPipe,prPipe,prpPipe;
+var camCen=[0,0],camExtX=simulationBox[0][1],camExtY,camExtXT=simulationBox[0][1];
+var lastT=0,mDrag=null,fID=0,paused=false;
+
+function genPData(){const d=new Float32Array(particleCount*5);for(let i=0;i<particleCount;++i){d[5*i]=simulationBox[0][0]+Math.random()*(simulationBox[0][1]-simulationBox[0][0]);d[5*i+1]=simulationBox[1][0]+Math.random()*(simulationBox[1][1]-simulationBox[1][0]);d[5*i+2]=initialVelocity*(-1+Math.random()*2);d[5*i+3]=initialVelocity*(-1+Math.random()*2);d[5*i+4]=Math.floor(Math.random()*speciesCount);}return d;}
+function genFData(){const d=new Float32Array(speciesCount*speciesCount*3);for(let i=0;i<speciesCount;++i){for(let j=0;j<speciesCount;++j){d[3*(i*speciesCount+j)]=maxForceStrength*(.25+.75*Math.random())*(Math.random()<.5?1:-1);d[3*(i*speciesCount+j)+1]=Math.random()*maxForceRadius;d[3*(i*speciesCount+j)+2]=Math.random()*.5*d[3*(i*speciesCount+j)+1];}}return d;}
+
+function redraw(){if(!device)return;const now=performance.now()*.001;const dt=Math.max(0,now-lastT);lastT=now;
+camExtX+=(camExtXT-camExtX)*(-Math.expm1(-20*dt));camExtY=camExtX*canvas.height/canvas.width;
+const simDt=Math.min(.025,dt);const fricFac=Math.exp(-simDt*currentFriction);
+device.queue.writeBuffer(simOptBuf,0,new Float32Array([simulationBox[0][0],simulationBox[0][1],simulationBox[1][0],simulationBox[1][1],fricFac,simDt,maxForceRadius,speciesCount,currentForceScale,currentParticleSize]));
+device.queue.writeBuffer(camBuf,0,new Float32Array([camCen[0],camCen[1],camExtX,camExtY]));
+const enc=device.createCommandEncoder();if(!paused){enc.copyBufferToBuffer(pBuf,0,ptBuf,0,pBuf.size);
+const cp=enc.beginComputePass();cp.setBindGroup(1,soBG);cp.setBindGroup(0,pBROBG);cp.setBindGroup(2,bfsBG);
+cp.setPipeline(bcsp);cp.dispatchWorkgroups(Math.ceil((binCount+1)/64));cp.setPipeline(bfsp);cp.dispatchWorkgroups(Math.ceil(particleCount/64));
+cp.setPipeline(bpsPipe);for(let i=0;i<prefixSumIterations;++i){cp.setBindGroup(0,bpsBG[i%2],[i*256]);cp.dispatchWorkgroups(Math.ceil((binCount+1)/64));}
+cp.setBindGroup(0,psBG);cp.setPipeline(pscPipe);cp.dispatchWorkgroups(Math.ceil((binCount+1)/64));cp.setPipeline(psPipe);cp.dispatchWorkgroups(Math.ceil(particleCount/64));
+cp.setBindGroup(0,pcfBG);cp.setPipeline(pcfPipe);cp.dispatchWorkgroups(Math.ceil(particleCount/64));
+cp.setBindGroup(0,pBBG);cp.setPipeline(paPipe);cp.dispatchWorkgroups(Math.ceil(particleCount/64));cp.end();}
+const rp=enc.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:[.05,.05,.05,1],loadOp:'clear',storeOp:'store'}]});
+rp.setBindGroup(0,pBROBG);rp.setBindGroup(1,camBG); // camBG now has simOptBuf for particleSize
+rp.setPipeline(prgPipe);rp.draw(particleCount*6);
+if(canvas.width/(2*camExtX)<1){rp.setPipeline(prpPipe);rp.draw(particleCount);}else{rp.setPipeline(prPipe);rp.draw(particleCount*6);}
+rp.end();device.queue.submit([enc.finish()]);++fID;requestAnimationFrame(redraw);}
+
+function setupUIControls(){const cpEl=document.getElementById('controlPanelContainer');const tglBtn=document.getElementById('toggleControlsButton');
+tglBtn.onclick=()=>{cpEl.classList.toggle('panel-hidden');if(cpEl.classList.contains('panel-hidden')){tglBtn.textContent='◀️';tglBtn.style.borderRadius='5px';}else{tglBtn.textContent='▶️';tglBtn.style.borderRadius='5px 0 0 5px';}};
+tglBtn.textContent='▶️'; tglBtn.style.borderRadius='5px 0 0 5px'; // Initial state for open panel
+// Friction
+const fricS=document.getElementById('frictionSlider'),fricV=document.getElementById('frictionValue');fricS.value=currentFriction;fricV.textContent=currentFriction.toFixed(1);fricS.oninput=(e)=>{currentFriction=parseFloat(e.target.value);fricV.textContent=currentFriction.toFixed(1);};
+// Force Scale
+const forceS=document.getElementById('forceScaleSlider'),forceV=document.getElementById('forceScaleValue');forceS.value=currentForceScale;forceV.textContent=currentForceScale.toFixed(2);forceS.oninput=(e)=>{currentForceScale=parseFloat(e.target.value);forceV.textContent=currentForceScale.toFixed(2);};
+// Particle Size
+const sizeS=document.getElementById('particleSizeSlider'),sizeV=document.getElementById('particleSizeValue');sizeS.value=currentParticleSize;sizeV.textContent=currentParticleSize.toFixed(2);sizeS.oninput=(e)=>{currentParticleSize=parseFloat(e.target.value);sizeV.textContent=currentParticleSize.toFixed(2);};
+// Palette
+const palSel=document.getElementById('paletteSelector');palettes.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name;palSel.add(o);});palSel.value=currentPaletteIndex;
+palSel.onchange=(e)=>{currentPaletteIndex=parseInt(e.target.value);const d=palettes[currentPaletteIndex].gen(speciesCount);if(device&&sBuf)device.queue.writeBuffer(sBuf,0,d);console.log(`Palette: ${palettes[currentPaletteIndex].name}`);};
+// Buttons
+document.getElementById('randomizeForcesButton').onclick=()=>{const d=genFData();device.queue.writeBuffer(fBuf,0,d);console.log("Forces randomized.");};
+document.getElementById('resetSimulationButton').onclick=()=>{const d=genPData();device.queue.writeBuffer(pBuf,0,d);console.log("Particles reset.");};
+}
+
+async function init(){canvas=document.getElementById("mainCanvas");canvas.width=innerWidth;canvas.height=innerHeight;
+canvas.onwheel=e=>{e.preventDefault();const r=canvas.getBoundingClientRect();const mX=e.clientX-r.left;const mY=e.clientY-r.top;
+const cX=(mX/canvas.width-.5)*2;const cY=(.5-mY/canvas.height)*2;
+const wXOld=camCen[0]+cX*camExtX;const wYOld=camCen[1]+cY*camExtY;
+const factor=Math.pow(1.25,e.deltaY/120);camExtXT*=factor;
+// For immediate cursor-centric zoom, adjust camCen based on new EXTENT (not target extent for this part)
+const newExtX=camExtX*factor; const newExtY=camExtY*factor; // Approximate immediate change
+camCen[0]=wXOld-cX*newExtX; camCen[1]=wYOld-cY*newExtY;
+};
+canvas.onmousedown=e=>{if(e.target.closest("#controlPanelContainer"))return;mDrag=[e.clientX,e.clientY];e.preventDefault();};
+canvas.onmouseup=()=>{mDrag=null;};
+canvas.onmousemove=e=>{if(mDrag){const dx=e.clientX-mDrag[0],dy=e.clientY-mDrag[1];camCen[0]-=dx/canvas.width*camExtX*2;camCen[1]+=dy/canvas.height*camExtY*2;mDrag=[e.clientX,e.clientY];}};
+window.onkeydown=e=>{if(e.key==' '){paused=!paused;e.preventDefault();}if(e.key=='c'){camCen=[0,0];camExtXT=simulationBox[0][1];e.preventDefault();}
+const zF=1.1;if(e.key==='-'||e.key==='_'){camExtXT*=zF;e.preventDefault();}if(e.key==='='||e.key==='+'){camExtXT/=zF;e.preventDefault();}};
+if(!navigator.gpu){alert("WebGPU not supported.");return;}
+const adapter=await navigator.gpu.requestAdapter();if(!adapter){alert("No adapter.");return;}
+device=await adapter.requestDevice();if(!device){alert("No device.");return;}
+context=canvas.getContext('webgpu');surfaceFormat=navigator.gpu.getPreferredCanvasFormat();context.configure({device,format:surfaceFormat});
+const sData=palettes[currentPaletteIndex].gen(speciesCount);sBuf=device.createBuffer({size:sData.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.STORAGE});device.queue.writeBuffer(sBuf,0,sData);
+const fData=genFData();fBuf=device.createBuffer({size:fData.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.STORAGE});device.queue.writeBuffer(fBuf,0,fData);
+const pData=genPData();pBuf=device.createBuffer({size:pData.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC|GPUBufferUsage.STORAGE});device.queue.writeBuffer(pBuf,0,pData);
+ptBuf=device.createBuffer({size:pBuf.size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});
+boBuf=device.createBuffer({size:(binCount+1)*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST});
+botBuf=device.createBuffer({size:(binCount+1)*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});
+const bpsData=new Uint32Array(prefixSumIterations*64);for(let i=0;i<prefixSumIterations;++i)bpsData[i*64]=2**i;
+bpsBuf=device.createBuffer({size:bpsData.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.UNIFORM});device.queue.writeBuffer(bpsBuf,0,bpsData);
+camBuf=device.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.UNIFORM});
+simOptBuf=device.createBuffer({size:40,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.UNIFORM}); // 10 floats * 4 bytes
+const bfm=device.createShaderModule({code:binFillSizeShader}),bpm=device.createShaderModule({code:binPrefixSumShader}),
+psm=device.createShaderModule({code:particleSortShader}),pcm=device.createShaderModule({code:particleComputeForcesShader}),
+pam=device.createShaderModule({code:particleAdvanceShader}),prm=device.createShaderModule({code:particleRenderShader});
+
+const pBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}}]});
+pBBG=device.createBindGroup({layout:pBGL,entries:[{binding:0,resource:{buffer:pBuf}},{binding:1,resource:{buffer:fBuf}}]});
+const pBROBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}},{binding:1,visibility:GPUShaderStage.VERTEX|GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}}]});
+pBROBG=device.createBindGroup({layout:pBROBGL,entries:[{binding:0,resource:{buffer:pBuf}},{binding:1,resource:{buffer:sBuf}}]});
+// Camera bind group now includes simOptBuf for particleSize in renderer
+const camBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX,buffer:{type:'uniform'}},{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:'uniform'}}]});
+camBG=device.createBindGroup({layout:camBGL,entries:[{binding:0,resource:{buffer:camBuf}},{binding:1,resource:{buffer:simOptBuf}}]});
+const soBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'uniform'}}]});
+soBG=device.createBindGroup({layout:soBGL,entries:[{binding:0,resource:{buffer:simOptBuf}}]});
+const bfsBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}}]});
+bfsBG=device.createBindGroup({layout:bfsBGL,entries:[{binding:0,resource:{buffer:boBuf}}]});
+const bpsBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:'uniform',hasDynamicOffset:true}}]});
+bpsBG[0]=device.createBindGroup({layout:bpsBGL,entries:[{binding:0,resource:{buffer:boBuf}},{binding:1,resource:{buffer:botBuf}},{binding:2,resource:{buffer:bpsBuf,size:4}}]});
+bpsBG[1]=device.createBindGroup({layout:bpsBGL,entries:[{binding:0,resource:{buffer:botBuf}},{binding:1,resource:{buffer:boBuf}},{binding:2,resource:{buffer:bpsBuf,size:4}}]});
+const psBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}},{binding:3,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}}]});
+psBG=device.createBindGroup({layout:psBGL,entries:[{binding:0,resource:{buffer:ptBuf}},{binding:1,resource:{buffer:pBuf}},{binding:2,resource:{buffer:boBuf}},{binding:3,resource:{buffer:botBuf}}]});
+const pcfBGL=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:'read-only-storage'}}]});
+pcfBG=device.createBindGroup({layout:pcfBGL,entries:[{binding:0,resource:{buffer:pBuf}},{binding:1,resource:{buffer:boBuf}},{binding:2,resource:{buffer:fBuf}}]});
+
+const cPPL=(b)=>(device.createPipelineLayout({bindGroupLayouts:b}));
+bcsp=device.createComputePipeline({layout:cPPL([pBROBGL,soBGL,bfsBGL]),compute:{module:bfm,entryPoint:'clear'}});
+bfsp=device.createComputePipeline({layout:cPPL([pBROBGL,soBGL,bfsBGL]),compute:{module:bfm,entryPoint:'fill'}});
+bpsPipe=device.createComputePipeline({layout:cPPL([bpsBGL]),compute:{module:bpm,entryPoint:'step'}});
+pscPipe=device.createComputePipeline({layout:cPPL([psBGL,soBGL]),compute:{module:psm,entryPoint:'clear'}});
+psPipe=device.createComputePipeline({layout:cPPL([psBGL,soBGL]),compute:{module:psm,entryPoint:'sort'}});
+pcfPipe=device.createComputePipeline({layout:cPPL([pcfBGL,soBGL]),compute:{module:pcm,entryPoint:'compute'}});
+paPipe=device.createComputePipeline({layout:cPPL([pBGL,soBGL]),compute:{module:pam,entryPoint:'advance'}});
+const blend={color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'}};
+const commonRPDesc={layout:cPPL([pBROBGL,camBGL]),primitive:{topology:'triangle-list'},fragment:{targets:[{format:surfaceFormat,blend}]}}; // camBGL is now used for render pipelines
+prgPipe=device.createRenderPipeline({...commonRPDesc,vertex:{module:prm,entryPoint:'vsGlow'},fragment:{...commonRPDesc.fragment,module:prm,entryPoint:'fsGlow'}});
+prPipe=device.createRenderPipeline({...commonRPDesc,vertex:{module:prm,entryPoint:'vsCircle'},fragment:{...commonRPDesc.fragment,module:prm,entryPoint:'fsCircle'}});
+prpPipe=device.createRenderPipeline({...commonRPDesc,layout:cPPL([pBROBGL,camBGL]),primitive:{topology:'point-list'},vertex:{module:prm,entryPoint:'vsPoint'},fragment:{...commonRPDesc.fragment,module:prm,entryPoint:'fsPoint'}});
+
+setupUIControls();redraw();
+}
+window.onload=init;window.onresize=()=>{if(!canvas)return;canvas.width=innerWidth;canvas.height=innerHeight;};
+        </script>
+    </head>
+    <body>
+        <canvas id="mainCanvas"></canvas>
+        <div id="controlPanelContainer">
+            <button id="toggleControlsButton"></button> <!-- Text content set by JS -->
+            <div id="controlPanel">
+                <div class="control-row">
+                    <label for="frictionSlider">Friction:</label>
+                    <input type="range" id="frictionSlider" min="0" max="50" step="0.1">
+                    <span id="frictionValue" class="value-display"></span>
+                </div>
+                <div class="control-row">
+                    <label for="forceScaleSlider">Force Scale:</label>
+                    <input type="range" id="forceScaleSlider" min="0.1" max="5" step="0.05">
+                    <span id="forceScaleValue" class="value-display"></span>
+                </div>
+                <div class="control-row">
+                    <label for="particleSizeSlider">Size:</label>
+                    <input type="range" id="particleSizeSlider" min="0.2" max="5" step="0.05">
+                    <span id="particleSizeValue" class="value-display"></span>
+                </div>
+                <div class="control-row">
+                    <label for="paletteSelector">Palette:</label>
+                    <select id="paletteSelector"></select>
+                </div>
+                <div class="button-row">
+                    <button id="randomizeForcesButton">Randomize Forces</button>
+                    <button id="resetSimulationButton">Reset Simulation</button>
+                </div>
+            </div>
+        </div>
+        <div id="copyright">by <a href="https://lisyarus.github.io/blog">@lisyarus</a></div>
+    </body>
+</html>
