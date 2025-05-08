@@ -54,6 +54,7 @@ struct Force
 {
     strength: f32, // positive if attraction
     radius: f32,
+    collisionStrength : f32,
     collisionRadius: f32,
 }
 `;
@@ -70,6 +71,7 @@ struct SimulationOptions
     dt : f32,
     binSize : f32,
     speciesCount : f32,
+    centralForce : f32,
 }
 
 struct BinInfo
@@ -224,7 +226,7 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
     var totalForce = vec2f(0.0, 0.0);
 
-    // totalForce -= vec2f(particle.x, particle.y);
+    totalForce -= vec2f(particle.x, particle.y) * simulationOptions.centralForce;
 
     for (var binX = binXMin; binX <= binXMax; binX += 1) {
         for (var binY = binYMin; binY <= binYMax; binY += 1) {
@@ -248,7 +250,7 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
                     let n = r / d;
 
                     totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
-                    totalForce -= 10.0 * abs(force.strength) * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                    totalForce -= force.collisionStrength * max(0.0, 1.0 - d / force.collisionRadius) * n;
                 }
             }
         }
@@ -414,26 +416,19 @@ var context;
 var surfaceFormat;
 var device;
 
-const speciesCount = 2 + Math.floor(Math.random() * 14);
-
-// const particleCount = 1048576;
-// const simulationBox = [[-3200, 3200], [-1800, 1800]];
-
-// const particleCount = 262144;
-// const simulationBox = [[-1600, 1600], [-900, 900]];
-
-const particleCount = 65536;
-const simulationBox = [[-800, 800], [-450, 450]];
-// const simulationBox = [[-400, 400], [-225, 225]];
-
 const maxForceRadius = 32.0;
 const maxForceStrength = 100.0;
 const initialVelocity = 10.0;
-const friction = 10.0;
 
-const gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
-const binCount = gridSize[0] * gridSize[1];
-const prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
+var speciesCount = 8;
+var particleCount = 65536;
+var simulationBox = [[-800, 800], [-450, 450]];
+var friction = 10.0;
+var gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
+var binCount = gridSize[0] * gridSize[1];
+var prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
+
+var currentSystemDescription;
 
 var speciesBuffer;
 var forcesBuffer;
@@ -444,6 +439,15 @@ var binOffsetTempBuffer;
 var binPrefixSumStepSizeBuffer;
 var cameraBuffer;
 var simulationOptionsBuffer;
+
+var particleBufferBindGroupLayout;
+var particleBufferReadOnlyBindGroupLayout;
+var cameraBindGroupLayout;
+var simulationOptionsBindGroupLayout;
+var binFillSizeBindGroupLayout;
+var binPrefixSumBindGroupLayout;
+var particleSortBindGroupLayout;
+var particleComputeForcesBindGroupLayout;
 
 var particleBufferBindGroup;
 var particleBufferReadOnlyBindGroup;
@@ -481,6 +485,7 @@ const activeTouches = new Map();
 var frameID = 0;
 
 var paused = false;
+var toolsPanelShown = true;
 
 function redraw()
 {
@@ -499,11 +504,20 @@ function redraw()
         cameraCenter[1] -= cameraExtentXDelta * zoomAnchor[1] / aspectRatio;
     }
 
+    const toolsPanel = document.getElementById("toolsPanel");
+    var toolsPanelAlpha = Number(toolsPanel.style.opacity);
+    toolsPanelAlpha += ((toolsPanelShown ? 1.0 : 0.0) - toolsPanelAlpha) * (- Math.expm1(- 20 * dt));
+    toolsPanel.style.opacity = toolsPanelAlpha;
+    toolsPanel.style.visibility = (toolsPanelAlpha < 0.01) ? "hidden" : "visible";
+
     const simDt = Math.min(0.025, dt);
+
+    // const centralForce = document.getElementById("centralForce").checked;
+    const centralForce = false;
 
     const frictionFactor = Math.exp(- simDt * friction);
 
-    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount]));
+    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce ? 1.0 : 0.0]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY]));
  
     const encoder = device.createCommandEncoder({});
@@ -594,6 +608,322 @@ function redraw()
     requestAnimationFrame(redraw);
 }
 
+function centerView()
+{
+    cameraCenter = [0.0, 0.0];
+    zoomAnchor = null;
+    cameraExtentXTarget = simulationBox[0][1];
+}
+
+function loadSystem(systemDescription)
+{
+    currentSystemDescription = systemDescription;
+
+    particleCount = systemDescription.particleCount;
+    speciesCount = systemDescription.species.length;
+
+    friction = systemDescription.friction;
+
+    document.getElementById("particleCountSlider").value = Math.round(Math.log2(particleCount));
+    document.getElementById("particleCountText").innerText = `${particleCount} particles`;
+    document.getElementById("speciesCountSlider").value = speciesCount;
+    document.getElementById("speciesCountText").innerText = `${speciesCount} particle types`;
+    document.getElementById("simulationWidthSlider").value = Math.round(systemDescription.simulationSize[0] / 100);
+    document.getElementById("simulationWidthText").innerText = `Width: ${systemDescription.simulationSize[0]}`;
+    document.getElementById("simulationHeightSlider").value = Math.round(systemDescription.simulationSize[1] / 100);
+    document.getElementById("simulationHeightText").innerText = `Height: ${systemDescription.simulationSize[1]}`;
+    document.getElementById("frictionSlider").value = Math.round(friction);
+    document.getElementById("frictionText").innerText = `Friction: ${friction}`;
+
+    const W = systemDescription.simulationSize[0] / 2.0;
+    const H = systemDescription.simulationSize[1] / 2.0;
+
+    simulationBox = [[-W, W], [-H, H]];
+
+    gridSize = [Math.ceil(systemDescription.simulationSize[0] / maxForceRadius), Math.ceil(systemDescription.simulationSize[1] / maxForceRadius)];
+    binCount = gridSize[0] * gridSize[1];
+    prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
+
+    const species = new Float32Array(speciesCount * 4);
+    for (var i = 0; i < speciesCount; ++i)
+    {
+        species[4 * i + 0] = systemDescription.species[i].color[0];
+        species[4 * i + 1] = systemDescription.species[i].color[1];
+        species[4 * i + 2] = systemDescription.species[i].color[2];
+        species[4 * i + 3] = 1.0;
+    }
+
+    speciesBuffer = device.createBuffer({
+        size: speciesCount * 16,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    });
+    
+    device.queue.writeBuffer(speciesBuffer, 0, species);
+
+    const forces = new Float32Array(speciesCount * speciesCount * 4);
+    for (var i = 0; i < speciesCount; ++i)
+    {
+        for (var j = 0; j < speciesCount; ++j)
+        {
+            forces[4 * (i * speciesCount + j) + 0] = systemDescription.species[i].forces[j].strength;
+            forces[4 * (i * speciesCount + j) + 1] = systemDescription.species[i].forces[j].radius;
+            forces[4 * (i * speciesCount + j) + 2] = systemDescription.species[i].forces[j].collisionStrength;
+            forces[4 * (i * speciesCount + j) + 3] = systemDescription.species[i].forces[j].collisionRadius;
+        }
+    }
+
+    forcesBuffer = device.createBuffer({
+        size: speciesCount * speciesCount * 16,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    });
+    
+    device.queue.writeBuffer(forcesBuffer, 0, forces);
+
+    const initialParticles = new Float32Array(particleCount * 5);
+
+    for (var i = 0; i < particleCount; ++i)
+    {
+        initialParticles[5 * i + 0] = simulationBox[0][0] + Math.random() * (simulationBox[0][1] - simulationBox[0][0]);
+        initialParticles[5 * i + 1] = simulationBox[1][0] + Math.random() * (simulationBox[1][1] - simulationBox[1][0]);
+        initialParticles[5 * i + 2] = initialVelocity * (-1.0 + Math.random() * 2.0);
+        initialParticles[5 * i + 3] = initialVelocity * (-1.0 + Math.random() * 2.0);
+        initialParticles[5 * i + 4] = Math.floor(Math.random() * speciesCount);
+    }
+
+    particleBuffer = device.createBuffer({
+        size: particleCount * 20,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
+    });
+
+    device.queue.writeBuffer(particleBuffer, 0, initialParticles);
+
+    particleTempBuffer = device.createBuffer({
+        size: particleBuffer.size,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    binOffsetBuffer = device.createBuffer({
+        size: (binCount + 1) * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    binOffsetTempBuffer = device.createBuffer({
+        size: (binCount + 1) * 4,
+        usage: GPUBufferUsage.STORAGE,
+    });
+
+    const binPrefixSumStepSize = new Uint32Array(prefixSumIterations * 64);
+    for (var i = 0; i < prefixSumIterations; ++i)
+        binPrefixSumStepSize[i * 64] = Math.pow(2, i);
+
+    binPrefixSumStepSizeBuffer = device.createBuffer({
+        size: prefixSumIterations * 256,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    });
+
+    device.queue.writeBuffer(binPrefixSumStepSizeBuffer, 0, binPrefixSumStepSize);
+
+    particleBufferBindGroup = device.createBindGroup({
+        layout: particleBufferBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: particleBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: forcesBuffer,
+                },
+            },
+        ],
+    });
+
+    particleBufferReadOnlyBindGroup = device.createBindGroup({
+        layout: particleBufferReadOnlyBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: particleBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: speciesBuffer,
+                },
+            },
+        ],
+    });
+
+    binFillSizeBindGroup = device.createBindGroup({
+        layout: binFillSizeBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+        ],
+    });
+
+    binPrefixSumBindGroup[0] = device.createBindGroup({
+        layout: binPrefixSumBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: binOffsetTempBuffer,
+                },
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: binPrefixSumStepSizeBuffer,
+                    size: 4,
+                },
+            },
+        ],
+    });
+
+    binPrefixSumBindGroup[1] = device.createBindGroup({
+        layout: binPrefixSumBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: binOffsetTempBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: binPrefixSumStepSizeBuffer,
+                    size: 4,
+                },
+            },
+        ],
+    });
+
+    particleSortBindGroup = device.createBindGroup({
+        layout: particleSortBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: particleTempBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: particleBuffer,
+                },
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+            {
+                binding: 3,
+                resource: {
+                    buffer: binOffsetTempBuffer,
+                },
+            },
+        ],
+    });
+
+    particleComputeForcesBindGroup = device.createBindGroup({
+        layout: particleComputeForcesBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: particleBuffer,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: forcesBuffer,
+                },
+            },
+        ],
+    });
+}
+
+function randomizeSystem(systemDescription)
+{
+    const speciesCount = systemDescription.species.length;
+    systemDescription.species = [];
+
+    for (var i = 0; i < speciesCount; ++i)
+    {
+        const color = [
+            0.25 + Math.random() * 0.75,
+            0.25 + Math.random() * 0.75,
+            .25 + Math.random() * 0.75,
+            1.0,
+        ];
+
+        var forces = [];
+        for (var j = 0; j < speciesCount; ++j) {
+            const strength = maxForceStrength * (0.25 + 0.75 * Math.random()) * (Math.random() < 0.5 ? 1.0 : -1.0);
+            const collisionStrength = (5.0 + 15.0 * Math.random()) * strength;
+            const radius = 2.0 + Math.random() * (maxForceRadius - 2.0);
+            const collisionRadius = Math.random() * 0.5 * radius;
+            forces.push({
+                strength: strength,
+                collisionStrength: collisionStrength,
+                radius: radius,
+                collisionRadius : collisionRadius,
+            });
+        }
+
+        systemDescription.species.push({
+            color: color,
+            forces: forces,
+        });
+    }
+
+    return systemDescription;
+}
+
+function initialSystem()
+{
+    const systemDescription = {
+        particleCount: particleCount,
+        species: new Array(speciesCount),
+        simulationSize: [1600.0, 900.0],
+        friction: friction,
+    };
+    return randomizeSystem(systemDescription);
+}
+
 async function init()
 {
     canvas = document.getElementById("mainCanvas");
@@ -638,6 +968,11 @@ async function init()
         for (const touch of event.changedTouches) {
             activeTouches.set(touch.identifier, [touch.pageX, touch.pageY]);
         }
+
+        if (activeTouches.size == 3) {
+            toolsPanelShown = !toolsPanelShown;
+        }
+
         event.preventDefault();
     });
 
@@ -701,14 +1036,18 @@ async function init()
 
     window.addEventListener('keydown',function(event) {
         if (event.key == ' ') {
-            paused = !paused;
+            pauseClicked();
             event.preventDefault();
         }
 
         if (event.key == 'c') {
-            cameraCenter = [0.0, 0.0];
-            zoomAnchor = null;
-            cameraExtentXTarget = simulationBox[0][1];
+            centerView();
+            event.preventDefault();
+        }
+
+        if (event.key == 's') {
+            toolsPanelShown = !toolsPanelShown;
+            event.preventDefault();
         }
     }, false);
 
@@ -743,114 +1082,13 @@ async function init()
         format: surfaceFormat,
     });
 
-    const species = new Float32Array(speciesCount * 4);
-    for (var i = 0; i < speciesCount; ++i)
-    {
-        species[4 * i + 0] = 0.25 + Math.random() * 0.75;
-        species[4 * i + 1] = 0.25 + Math.random() * 0.75;
-        species[4 * i + 2] = 0.25 + Math.random() * 0.75;
-        species[4 * i + 3] = 1.0;
-    }
-
-    speciesBuffer = device.createBuffer({
-        size: speciesCount * 16,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-    
-    device.queue.writeBuffer(speciesBuffer, 0, species);
-
-    const forces = new Float32Array(speciesCount * speciesCount * 3);
-    for (var i = 0; i < speciesCount; ++i)
-    {
-        for (var j = 0; j < speciesCount; ++j)
-        {
-            forces[3 * (i * speciesCount + j) + 0] = maxForceStrength * (0.25 + 0.75 * Math.random()) * (Math.random() < 0.5 ? 1.0 : -1.0);
-            forces[3 * (i * speciesCount + j) + 1] = Math.random() * maxForceRadius;
-            forces[3 * (i * speciesCount + j) + 2] = Math.random() * 0.5 * forces[3 * (i * speciesCount + j) + 1];
-        }
-    }
-
-    forcesBuffer = device.createBuffer({
-        size: speciesCount * speciesCount * 12,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-    
-    device.queue.writeBuffer(forcesBuffer, 0, forces);
-
-    var systemInfo = {
-        species: [],
-    };
-
-    for (var i = 0; i < speciesCount; ++i)
-    {
-        systemInfo.species[i] = {
-            color: [species[4 * i + 0], species[4 * i + 1], species[4 * i + 2], species[4 * i + 3]],
-            forces: [],
-        };
-
-        for (var j = 0; j < speciesCount; ++j)
-        {
-            systemInfo.species[i].forces[j] = {
-                strength: forces[3 * (i * speciesCount + j) + 0],
-                radius: forces[3 * (i * speciesCount + j) + 1],
-                collisionRadius: forces[3 * (i * speciesCount + j) + 2],
-            };
-        }
-    }
-
-    console.log(JSON.stringify(systemInfo));
-
-    const initialParticles = new Float32Array(particleCount * 5);
-
-    for (var i = 0; i < particleCount; ++i)
-    {
-        initialParticles[5 * i + 0] = simulationBox[0][0] + Math.random() * (simulationBox[0][1] - simulationBox[0][0]);
-        initialParticles[5 * i + 1] = simulationBox[1][0] + Math.random() * (simulationBox[1][1] - simulationBox[1][0]);
-        initialParticles[5 * i + 2] = initialVelocity * (-1.0 + Math.random() * 2.0);
-        initialParticles[5 * i + 3] = initialVelocity * (-1.0 + Math.random() * 2.0);
-        initialParticles[5 * i + 4] = Math.floor(Math.random() * speciesCount);
-    }
-
-    particleBuffer = device.createBuffer({
-        size: particleCount * 20,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
-    });
-
-    device.queue.writeBuffer(particleBuffer, 0, initialParticles);
-
-    particleTempBuffer = device.createBuffer({
-        size: particleBuffer.size,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
-    binOffsetBuffer = device.createBuffer({
-        size: (binCount + 1) * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    });
-
-    binOffsetTempBuffer = device.createBuffer({
-        size: (binCount + 1) * 4,
-        usage: GPUBufferUsage.STORAGE,
-    });
-
-    const binPrefixSumStepSize = new Uint32Array(prefixSumIterations * 64);
-    for (var i = 0; i < prefixSumIterations; ++i)
-        binPrefixSumStepSize[i * 64] = Math.pow(2, i);
-
-    binPrefixSumStepSizeBuffer = device.createBuffer({
-        size: prefixSumIterations * 256,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-    });
-
-    device.queue.writeBuffer(binPrefixSumStepSizeBuffer, 0, binPrefixSumStepSize);
-
     cameraBuffer = device.createBuffer({
         size: 16,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
     simulationOptionsBuffer = device.createBuffer({
-        size: 32,
+        size: 36,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
@@ -878,7 +1116,7 @@ async function init()
         code: particleRenderShader,
     });
 
-    const particleBufferBindGroupLayout = device.createBindGroupLayout({
+    particleBufferBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -897,25 +1135,7 @@ async function init()
         ],
     });
 
-    particleBufferBindGroup = device.createBindGroup({
-        layout: particleBufferBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: particleBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: forcesBuffer,
-                },
-            },
-        ],
-    });
-
-    const particleBufferReadOnlyBindGroupLayout = device.createBindGroupLayout({
+    particleBufferReadOnlyBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -934,25 +1154,7 @@ async function init()
         ],
     });
 
-    particleBufferReadOnlyBindGroup = device.createBindGroup({
-        layout: particleBufferReadOnlyBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: particleBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: speciesBuffer,
-                },
-            },
-        ],
-    });
-
-    const cameraBindGroupLayout = device.createBindGroupLayout({
+    cameraBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -976,7 +1178,7 @@ async function init()
         ],
     });
 
-    const simulationOptionsBindGroupLayout = device.createBindGroupLayout({
+    simulationOptionsBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -1000,7 +1202,7 @@ async function init()
         ],
     });
 
-    const binFillSizeBindGroupLayout = device.createBindGroupLayout({
+    binFillSizeBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -1012,19 +1214,7 @@ async function init()
         ],
     });
 
-    binFillSizeBindGroup = device.createBindGroup({
-        layout: binFillSizeBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: binOffsetBuffer,
-                },
-            },
-        ],
-    });
-
-    const binPrefixSumBindGroupLayout = device.createBindGroupLayout({
+    binPrefixSumBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -1051,57 +1241,7 @@ async function init()
         ],
     });
 
-    binPrefixSumBindGroup[0] = device.createBindGroup({
-        layout: binPrefixSumBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: binOffsetBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: binOffsetTempBuffer,
-                },
-            },
-            {
-                binding: 2,
-                resource: {
-                    buffer: binPrefixSumStepSizeBuffer,
-                    size: 4,
-                },
-            },
-        ],
-    });
-
-    binPrefixSumBindGroup[1] = device.createBindGroup({
-        layout: binPrefixSumBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: binOffsetTempBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: binOffsetBuffer,
-                },
-            },
-            {
-                binding: 2,
-                resource: {
-                    buffer: binPrefixSumStepSizeBuffer,
-                    size: 4,
-                },
-            },
-        ],
-    });
-
-    const particleSortBindGroupLayout = device.createBindGroupLayout({
+    particleSortBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -1134,37 +1274,7 @@ async function init()
         ],
     });
 
-    particleSortBindGroup = device.createBindGroup({
-        layout: particleSortBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: particleTempBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: particleBuffer,
-                },
-            },
-            {
-                binding: 2,
-                resource: {
-                    buffer: binOffsetBuffer,
-                },
-            },
-            {
-                binding: 3,
-                resource: {
-                    buffer: binOffsetTempBuffer,
-                },
-            },
-        ],
-    });
-
-    const particleComputeForcesBindGroupLayout = device.createBindGroupLayout({
+    particleComputeForcesBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -1185,30 +1295,6 @@ async function init()
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
                     type: 'read-only-storage',
-                },
-            },
-        ],
-    });
-
-    particleComputeForcesBindGroup = device.createBindGroup({
-        layout: particleComputeForcesBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: particleBuffer,
-                },
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: binOffsetBuffer,
-                },
-            },
-            {
-                binding: 2,
-                resource: {
-                    buffer: forcesBuffer,
                 },
             },
         ],
@@ -1411,6 +1497,8 @@ async function init()
         }
     });
 
+    loadSystem(initialSystem());
+
     redraw();
 }
 
@@ -1425,6 +1513,84 @@ function resize()
 
 window.onload = init;
 window.onresize = resize;
+
+function pauseClicked()
+{
+    paused = !paused;
+    document.getElementById("pauseButton").innerText = paused ? "Continue" : "Pause";
+}
+
+function updateParticleCount()
+{
+    const newParticleCount = Math.round(Math.pow(2, document.getElementById("particleCountSlider").value));
+
+    const systemDescription = currentSystemDescription;
+    systemDescription.particleCount = newParticleCount;
+    loadSystem(systemDescription);
+}
+
+function updateSpeciesCount()
+{
+    const newSpeciesCount = Math.round(document.getElementById("speciesCountSlider").value);
+
+    const systemDescription = currentSystemDescription;
+    systemDescription.species = new Array(newSpeciesCount);
+    loadSystem(randomizeSystem(systemDescription));
+}
+
+function updateSimulationSize()
+{
+    const newWidth = document.getElementById("simulationWidthSlider").value * 100.0;
+    const newHeight = document.getElementById("simulationHeightSlider").value * 100.0;
+
+    const systemDescription = currentSystemDescription;
+    systemDescription.simulationSize = [newWidth, newHeight];
+    loadSystem(systemDescription);
+}
+
+function updateFriction()
+{
+    const newFriction = document.getElementById("frictionSlider").value;
+
+    currentSystemDescription.friction = newFriction;
+    friction = newFriction;
+
+    document.getElementById("frictionText").innerText = `Friction: ${newFriction}`;
+}
+
+async function saveSettings()
+{
+    const handle = await window.showSaveFilePicker({
+        id: "particle-life",
+        startIn: "downloads",
+        suggestedName: "particle-life-system.json",
+        types: [{
+            description: "JSON file",
+            accept: {"application/json": [".json"]},
+        }],
+    });
+
+    const writable = await handle.createWritable();
+    await writable.write(JSON.stringify(currentSystemDescription, null, 2));
+    await writable.close();
+}
+
+async function loadSettings()
+{
+    const [handle] = await window.showOpenFilePicker({
+        id: "particle-life",
+        startIn: "downloads",
+        suggestedName: "particle-life-system.json",
+        types: [{
+            description: "JSON file",
+            accept: {"application/json": [".json"]},
+        }],
+    });
+
+    const file = await handle.getFile();
+    const data = await file.text();
+    loadSystem(JSON.parse(data));
+}
 
         </script>
         <style>
@@ -1441,6 +1607,23 @@ window.onresize = resize;
                 font-size: 14;
             }
 
+            .panel {
+                background-color: rgba(50, 50, 50, 0.5);
+                border-radius: 12px;
+                border: 2px solid #eee;
+                color: #eee;
+                padding: 18px;
+                backdrop-filter: blur(4px);
+                font-family: monospace;
+                font-size: 14;
+            }
+
+            #toolsPanel {
+                position: fixed;
+                left: 24px;
+                top: 24px;
+            }
+
             a {
                 color: #bbb;
                 text-decoration: none;
@@ -1450,10 +1633,186 @@ window.onresize = resize;
                 color: #eee;
                 text-decoration: underline;
             }
+
+            label {
+                font-family: monospace;
+                font-size: 14;
+                color: #eee;
+            }
+
+            .checkboxContainer input {
+                position: absolute;
+                opacity: 0;
+                cursor: pointer;
+                height: 0;
+                width: 0;
+            }
+
+            .checkboxContainer {
+                display: block;
+                position: relative;
+                cursor: pointer;
+                padding-left: 32px;
+                padding-top: 4px;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+
+            .customCheckbox {
+                position: absolute;
+                top: 0px;
+                left: 0px;
+                height: 24px;
+                width: 24px;
+                background-color: #eee;
+                border-radius: 4px;
+            }
+
+            .checkboxContainer input:active ~ .customCheckbox{
+                top: 1px;
+                left: 1px;
+                height: 22px;
+                width: 22px;
+            }
+
+            .checkboxContainer:hover input ~ .customCheckbox {
+                background-color: #999;
+            }
+
+            .checkboxContainer input:checked ~ .customCheckbox {
+                background-color: #777;
+            }
+
+            .checkboxContainer:hover input:checked ~ .customCheckbox {
+                background-color: #555;
+            }
+
+            .customCheckbox:after {
+                content: "";
+                position: absolute;
+                display: none;
+            }
+
+            .checkboxContainer input:checked ~ .customCheckbox:after {
+                display: block;
+            }
+
+            .checkboxContainer .customCheckbox:after {
+                left: 8px;
+                top: 4px;
+                width: 5px;
+                height: 10px;
+                border: solid white;
+                border-width: 0 3px 3px 0;
+                -webkit-transform: rotate(45deg);
+                -ms-transform: rotate(45deg);
+                transform: rotate(45deg);
+            }
+
+            .checkboxContainer input:active ~ .customCheckbox:after {
+                left: 7px;
+                top: 3px;
+            }
+
+            .button {
+                background-color: #777;
+                padding: 4px;
+                border-radius: 4px;
+                text-align: center;
+                cursor: pointer;
+            }
+
+            .button:hover {
+                background-color: #555;
+            }
+
+            .button:active {
+                background-color: #444;
+            }
+
+            .rowBreak {
+                height: 8px;
+            }
+
+            .sliderContainer input {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 4px;
+                border-radius: 2px;
+                background: #ccc;
+                outline: none;
+            }
+
+            .sliderContainer input:hover {
+                background: #999;
+            }
+
+            .sliderContainer input::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                border: 2px solid #ccc;
+                background: #777;
+                cursor: pointer;
+            }
+
+            .sliderContainer input::-webkit-slider-thumb:hover  {
+                background: #555;
+                border: 2px solid #999;
+            }
         </style>
     </head>
     <body>
         <canvas id="mainCanvas"></canvas>
         <div id="copyright">by <a href="https://lisyarus.github.io/blog">@lisyarus</a></div>
+        <div id="toolsPanel" class="panel">
+            <div class="sliderContainer">
+                <input type="range" min="10" max="20" value="16" class="slider" id="particleCountSlider" oninput="updateParticleCount();">
+                <span id="particleCountText">65536 particles</span>
+            </div>
+            <div class="rowBreak"></div>
+            <div class="sliderContainer">
+                <input type="range" min="1" max="20" value="8" class="slider" id="speciesCountSlider" oninput="updateSpeciesCount();">
+                <span id="speciesCountText">8 particle types</span>
+            </div>
+            <div class="rowBreak"></div>
+            <div class="sliderContainer">
+                <input type="range" min="1" max="50" value="16" class="slider" id="simulationWidthSlider" oninput="updateSimulationSize();">
+                <span id="simulationWidthText">Width: 1600</span>
+            </div>
+            <div class="rowBreak"></div>
+            <div class="sliderContainer">
+                <input type="range" min="1" max="50" value="9" class="slider" id="simulationHeightSlider" oninput="updateSimulationSize();">
+                <span id="simulationHeightText">Height: 900</span>
+            </div>
+            <div class="rowBreak"></div>
+            <div class="sliderContainer">
+                <input type="range" min="0" max="100" value="10" class="slider" id="frictionSlider" oninput="updateFriction();">
+                <span id="frictionText">Friction: 10</span>
+            </div>
+            <div class="rowBreak"></div>
+            <div class="rowBreak"></div>
+            <div class="button" id="pauseButton" onclick="pauseClicked();">Pause</div>
+            <div class="rowBreak"></div>
+            <div class="button" id="randomizeButton" onclick="loadSystem(randomizeSystem(currentSystemDescription));">Randomize</div>
+            <div class="rowBreak"></div>
+            <div class="button" id="centerViewButton" onclick="centerView();">Center view</div>
+            <div class="rowBreak"></div>
+            <div class="button" id="saveSettingsButton" onclick="saveSettings();">Save system</div>
+            <div class="rowBreak"></div>
+            <div class="button" id="loadSettingsButton" onclick="loadSettings();">Load system</div>
+            <div class="rowBreak"></div>
+            <div><center>[S] or three-tap to hide this menu</center></div>
+<!--             <div class="rowBreak"></div>
+            <label class="checkboxContainer">
+                Central force
+                <input type="checkbox" id="centralForce" />
+                <span class="customCheckbox"></span>
+            </div> -->
+        </div>
     </body>
 </html>
