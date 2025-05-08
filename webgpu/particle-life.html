@@ -321,6 +321,7 @@ struct Camera
 {
     center : vec2f,
     extent : vec2f,
+    pixelsPerUnit : f32,
 }
 
 @group(0) @binding(0) var<storage, read> particles : array<Particle>;
@@ -387,27 +388,27 @@ fn fragmentCircle(in : CircleVertexOut) -> @location(0) vec4f
     return in.color * vec4f(1.0, 1.0, 1.0, alpha);
 }
 
-struct PointVertexOut
-{
-    @builtin(position) position : vec4f,
-    @location(1) color : vec4f,
-}
-
 @vertex
-fn vertexPoint(@builtin(vertex_index) id : u32) -> PointVertexOut
+fn vertexPoint(@builtin(vertex_index) id : u32) -> CircleVertexOut
 {
-    let particle = particles[id];
-    let position = vec2f(particle.x, particle.y);
-    return PointVertexOut(
+    let particle = particles[id / 6u];
+    let offset = 2.0 * offsets[id % 6u] / camera.pixelsPerUnit;
+    let position = vec2f(particle.x, particle.y) + offset;
+    return CircleVertexOut(
         vec4f((position - camera.center) / camera.extent, 0.0, 1.0),
+        offset,
         species[u32(particle.species)].color
     );
 }
 
+const PI = 3.1415926535;
+
 @fragment
-fn fragmentPoint(in : PointVertexOut) -> @location(0) vec4f
+fn fragmentPoint(in : CircleVertexOut) -> @location(0) vec4f
 {
-    return in.color;
+    let d = max(vec2(0.0), min(in.offset * camera.pixelsPerUnit + 0.5, vec2(camera.pixelsPerUnit)) - max(in.offset * camera.pixelsPerUnit - 0.5, - vec2(camera.pixelsPerUnit)));
+    let alpha = (PI / 4.0) * d.x * d.y;
+    return vec4f(in.color.rgb, in.color.a * alpha);
 }
 `;
 
@@ -504,6 +505,8 @@ function redraw()
         cameraCenter[1] -= cameraExtentXDelta * zoomAnchor[1] / aspectRatio;
     }
 
+    const pixelsPerUnit = canvas.width / (2.0 * cameraExtentX);
+
     const toolsPanel = document.getElementById("toolsPanel");
     var toolsPanelAlpha = Number(toolsPanel.style.opacity);
     toolsPanelAlpha += ((toolsPanelShown ? 1.0 : 0.0) - toolsPanelAlpha) * (- Math.expm1(- 20 * dt));
@@ -518,7 +521,7 @@ function redraw()
     const frictionFactor = Math.exp(- simDt * friction);
 
     device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce ? 1.0 : 0.0]));
-    device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY]));
+    device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
  
     const encoder = device.createCommandEncoder({});
 
@@ -573,9 +576,9 @@ function redraw()
     renderPass.setBindGroup(1, cameraBindGroup);
     renderPass.setPipeline(particleRenderGlowPipeline);
     renderPass.draw(particleCount * 6);
-    if (canvas.width / (2.0 * cameraExtentX) < 1.0) {
+    if (pixelsPerUnit < 2.0) {
         renderPass.setPipeline(particleRenderPointPipeline);
-        renderPass.draw(particleCount);
+        renderPass.draw(particleCount * 6);
     } else {
         renderPass.setPipeline(particleRenderPipeline);
         renderPass.draw(particleCount * 6);
@@ -1088,7 +1091,7 @@ async function init()
     });
 
     cameraBuffer = device.createBuffer({
-        size: 16,
+        size: 24,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
@@ -1163,7 +1166,7 @@ async function init()
         entries: [
             {
                 binding: 0,
-                visibility: GPUShaderStage.VERTEX,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                 buffer: {
                     type: 'uniform',
                 },
@@ -1479,7 +1482,7 @@ async function init()
             entryPoint: 'vertexPoint',
         },
         primitive: {
-            topology: 'point-list',
+            topology: 'triangle-list',
         },
         fragment: {
             module: particleRenderShaderModule,
