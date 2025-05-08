@@ -470,6 +470,8 @@ var cameraExtentX = simulationBox[0][1];
 var cameraExtentY = simulationBox[1][1];
 var cameraExtentXTarget = simulationBox[0][1];
 
+var zoomAnchor = null;
+
 var lastFrameTimestamp = 0.0;
 
 var mouseDrag = null;
@@ -484,8 +486,16 @@ function redraw()
     const dt = now - lastFrameTimestamp;
     lastFrameTimestamp = now;
 
-    cameraExtentX += (cameraExtentXTarget - cameraExtentX) * (- Math.expm1(- 20 * dt));
-    cameraExtentY = cameraExtentX * canvas.height / canvas.width;
+    const aspectRatio = canvas.width / canvas.height;
+    const cameraExtentXDelta = (cameraExtentXTarget - cameraExtentX) * (- Math.expm1(- 20 * dt));
+
+    cameraExtentX += cameraExtentXDelta;
+    cameraExtentY = cameraExtentX / aspectRatio;
+
+    if (zoomAnchor) {
+        cameraCenter[0] -= cameraExtentXDelta * zoomAnchor[0];
+        cameraCenter[1] -= cameraExtentXDelta * zoomAnchor[1] / aspectRatio;
+    }
 
     const simDt = Math.min(0.025, dt);
 
@@ -591,6 +601,12 @@ async function init()
     this.canvas.addEventListener('wheel',function(event) {
         const factor = Math.pow(1.25, event.deltaY / 120);
         cameraExtentXTarget *= factor;
+
+        zoomAnchor = [
+            2.0 * event.x / canvas.width - 1.0,
+            1.0 - 2.0 * event.y / canvas.height,
+        ];
+
         event.preventDefault();
     }, false);    
 
