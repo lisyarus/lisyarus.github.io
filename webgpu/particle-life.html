@@ -370,7 +370,7 @@ fn fragmentGlow(in : CircleVertexOut) -> @location(0) vec4f
 fn vertexCircle(@builtin(vertex_index) id : u32) -> CircleVertexOut
 {
     let particle = particles[id / 6u];
-    let offset = offsets[id % 6u];
+    let offset = offsets[id % 6u] * 1.5;
     let position = vec2f(particle.x, particle.y) + offset;
     return CircleVertexOut(
         vec4f((position - camera.center) / camera.extent, 0.0, 1.0),
@@ -382,9 +382,7 @@ fn vertexCircle(@builtin(vertex_index) id : u32) -> CircleVertexOut
 @fragment
 fn fragmentCircle(in : CircleVertexOut) -> @location(0) vec4f
 {
-    let l = length(in.offset);
-    let eps = fwidth(l);
-    let alpha = smoothstep(1.0, 1.0 - eps, l);
+    let alpha = clamp(camera.pixelsPerUnit - length(in.offset) * camera.pixelsPerUnit + 0.5, 0.0, 1.0);
     return in.color * vec4f(1.0, 1.0, 1.0, alpha);
 }
 
@@ -632,7 +630,7 @@ function redraw()
     hdrRenderPass.setBindGroup(1, cameraBindGroup);
     hdrRenderPass.setPipeline(particleRenderGlowPipeline);
     hdrRenderPass.draw(particleCount * 6);
-    if (pixelsPerUnit < 2.0) {
+    if (pixelsPerUnit < 1.0) {
         hdrRenderPass.setPipeline(particleRenderPointPipeline);
         hdrRenderPass.draw(particleCount * 6);
     } else {
