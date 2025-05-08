@@ -244,10 +244,12 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
                 let r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
                 let d = length(r);
-                let n = r / d;
+                if (d > 0.0) {
+                    let n = r / d;
 
-                totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
-                totalForce -= 10.0 * abs(force.strength) * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                    totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
+                    totalForce -= 10.0 * abs(force.strength) * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                }
             }
         }
     }
