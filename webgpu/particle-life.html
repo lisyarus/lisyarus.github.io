@@ -559,17 +559,13 @@ var mouseDrag = null;
 const activeTouches = new Map();
 
 var frameID = 0;
-var fakeStagingBufferQueue = [];
-var fakeStagingBufferCount = 0;
-var fakeTargetBuffer;
+var framesInFlight = 0;
 
 var paused = false;
 var toolsPanelShown = true;
 
 function redraw()
 {
-    const framesInFlight = fakeStagingBufferCount - fakeStagingBufferQueue.length;
-
     if (framesInFlight > 3) {
         requestAnimationFrame(redraw);
         return;
@@ -608,28 +604,6 @@ function redraw()
 
     device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce ? 1.0 : 0.0]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
-
-    if (!fakeTargetBuffer) {
-        fakeTargetBuffer = device.createBuffer({
-            size: 4,
-            usage: GPUBufferUsage.COPY_DST,
-        });
-    }
-
-    let fakeStagingBuffer;
-    if (fakeStagingBufferQueue.length > 0) {
-        fakeStagingBuffer = fakeStagingBufferQueue.pop();
-    } else {
-        fakeStagingBuffer = device.createBuffer({
-            size: 4,
-            usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
-            mappedAtCreation: true,
-        });
-        ++fakeStagingBufferCount;
-    }
-
-    (new Float32Array(fakeStagingBuffer.getMappedRange()))[0] = frameID;
-    fakeStagingBuffer.unmap();
  
     const encoder = device.createCommandEncoder({});
 
@@ -707,15 +681,13 @@ function redraw()
     composeRenderPass.setPipeline(composePipeline);
     composeRenderPass.draw(3);
     composeRenderPass.end();
-
-    encoder.copyBufferToBuffer(fakeStagingBuffer, 0, fakeTargetBuffer, 0, 4);
  
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 
-    fakeStagingBuffer.mapAsync(GPUMapMode.WRITE).then(() => {
-        fakeStagingBufferQueue.push(fakeStagingBuffer);
-    });
+    ++framesInFlight;
+
+    device.queue.onSubmittedWorkDone().then(() => { --framesInFlight; });
 
     ++frameID;
 
