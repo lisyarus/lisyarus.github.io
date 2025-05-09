@@ -1090,6 +1090,10 @@ async function loadImage(url) {
 
 async function init()
 {
+    const buttonsTable = document.getElementById("buttonsTable");
+    const toolsPanelStyle = window.getComputedStyle(document.getElementById("toolsPanel"), null);
+    buttonsTable.style.width = buttonsTable.parentElement.clientWidth - parseFloat(toolsPanelStyle.getPropertyValue('padding-left')) - parseFloat(toolsPanelStyle.getPropertyValue('padding-right'));
+
     canvas = document.getElementById("mainCanvas");
 
     canvas.addEventListener('wheel', function(event) {
@@ -1981,6 +1985,13 @@ async function loadSettings()
                 background: #555;
                 border: 2px solid #999;
             }
+
+            table {
+                table-layout: fixed;
+                border: none;
+                border-collapse: collapse;
+                color: #eee;
+            }
         </style>
     </head>
     <body>
@@ -2013,15 +2024,21 @@ async function loadSettings()
             </div>
             <div class="rowBreak"></div>
             <div class="rowBreak"></div>
-            <div class="button" id="pauseButton" onclick="pauseClicked();">Pause</div>
-            <div class="rowBreak"></div>
-            <div class="button" id="randomizeButton" onclick="loadSystem(randomizeSystem(currentSystemDescription));">Randomize</div>
-            <div class="rowBreak"></div>
-            <div class="button" id="centerViewButton" onclick="centerView();">Center view</div>
-            <div class="rowBreak"></div>
-            <div class="button" id="saveSettingsButton" onclick="saveSettings();">Save system</div>
-            <div class="rowBreak"></div>
-            <div class="button" id="loadSettingsButton" onclick="loadSettings();">Load system</div>
+            <table id="buttonsTable">
+                <tr>
+                    <td><div class="button" id="pauseButton" onclick="pauseClicked();">Pause</div></td>
+                    <td><div class="button" id="centerViewButton" onclick="centerView();">Center view</div></td>
+                </tr>
+                <tr>
+                    <td><div class="button" id="restartButton" onclick="loadSystem(currentSystemDescription);">Restart</div></td>
+                    <td><div class="button" id="randomizeButton" onclick="loadSystem(randomizeSystem(currentSystemDescription));">Randomize</div></td>
+                </tr>
+                <tr>
+                    <td><div class="button" id="saveSettingsButton" onclick="saveSettings();">Save system</div></td>
+                    <td><div class="button" id="loadSettingsButton" onclick="loadSettings();">Load system</div></td>
+                </tr>
+            </table>
+            
             <div class="rowBreak"></div>
             <div><center>[S] or three-tap to hide this menu</center></div>
 <!--             <div class="rowBreak"></div>
