@@ -465,9 +465,10 @@ fn dither(x : vec3f, n : f32) -> vec3f
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
-    var color = textureLoad(hdrTexture, vec2i(in.position.xy), 0).rgb;
+    var sample = textureLoad(hdrTexture, vec2i(in.position.xy), 0); 
     let noise = textureLoad(blueNoiseTexture, vec2u(in.position.xy) % textureDimensions(blueNoiseTexture), 0).r;
 
+    var color = sample.rgb;
     color = acesTonemap(color);
     color = pow(color, vec3f(1.0 / 2.2));
     color = dither(color, noise);
@@ -640,7 +641,7 @@ function redraw()
         colorAttachments: [
             {
                 view: hdrTextureView,
-                clearValue: [0.001, 0.001, 0.001, 1],
+                clearValue: [0.001, 0.001, 0.001, 0.0],
                 loadOp: 'clear',
                 storeOp: 'store',
             },
@@ -1569,7 +1570,7 @@ async function init()
                             dstFactor: 'one',
                         },
                         alpha: {
-                            srcFactor: 'src-alpha',
+                            srcFactor: 'one',
                             dstFactor: 'one',
                         },
                     },
@@ -1604,7 +1605,7 @@ async function init()
                             dstFactor: 'one',
                         },
                         alpha: {
-                            srcFactor: 'src-alpha',
+                            srcFactor: 'one',
                             dstFactor: 'one',
                         },
                     },
@@ -1639,7 +1640,7 @@ async function init()
                             dstFactor: 'one',
                         },
                         alpha: {
-                            srcFactor: 'src-alpha',
+                            srcFactor: 'one',
                             dstFactor: 'one',
                         },
                     },
