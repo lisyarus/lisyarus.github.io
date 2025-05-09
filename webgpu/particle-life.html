@@ -447,6 +447,47 @@ fn acesTonemap(x : vec3f) -> vec3f
     return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3f(0.0), vec3f(1.0));
 }
 
+fn maxTonemap(x : vec3f) -> vec3f
+{
+    let m = max(1.0, max(x.r, max(x.g, x.b)));
+    return x / m;
+}
+
+fn uncharted2TonemapImpl(x : vec3f) -> vec3f
+{
+    let A = 0.15;
+    let B = 0.50;
+    let C = 0.10;
+    let D = 0.20;
+    let E = 0.02;
+    let F = 0.30;
+
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+fn uncharted2Tonemap(x : vec3f) -> vec3f
+{
+    let exposure = 5.0;
+    let white = 10.0;
+    return uncharted2TonemapImpl(x * exposure) / uncharted2TonemapImpl(vec3f(white));
+}
+
+fn agxTonemap(x : vec3f) -> vec3f
+{
+    const M1 = mat3x3f(0.842, 0.0423, 0.0424, 0.0784, 0.878, 0.0784, 0.0792, 0.0792, 0.879);
+    const M2 = mat3x3f(1.2, -0.053, -0.053, -0.1, 1.15, -0.1, -0.1, -0.1, 1.15);
+    const c1 = 12.47393;
+    const c2 = 16.5;
+
+    var result = x * 0.5;
+    result = M1 * result;
+    result = clamp((log2(result) + c1) / c2, vec3f(0.0), vec3f(1.0));
+    result = 0.5 + 0.5 * sin(((-3.11 * result + 6.42) * result - 0.378) * result - 1.44);
+    result = M2 * result;
+
+    return result;
+}
+
 fn dither(x : vec3f, n : f32) -> vec3f
 {
     let c = x * 255.0;
