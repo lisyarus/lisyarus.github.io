@@ -533,6 +533,8 @@ var speciesCount = 8;
 var particleCount = 65536;
 var simulationBox = [[-800, 800], [-450, 450]];
 var friction = 10.0;
+var centralForce = 0.0;
+var symmetricForces = false;
 var gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
 var binCount = gridSize[0] * gridSize[1];
 var prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
@@ -638,12 +640,9 @@ function redraw()
 
     const simDt = Math.min(0.025, dt);
 
-    // const centralForce = document.getElementById("centralForce").checked;
-    const centralForce = false;
-
     const frictionFactor = Math.exp(- simDt * friction);
 
-    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce ? 1.0 : 0.0]));
+    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
  
     const encoder = device.createCommandEncoder({});
@@ -742,6 +741,23 @@ function centerView()
     cameraExtentXTarget = simulationBox[0][1];
 }
 
+function reloadForces(systemDescription)
+{
+    const forces = new Float32Array(speciesCount * speciesCount * 4);
+    for (var i = 0; i < speciesCount; ++i)
+    {
+        for (var j = 0; j < speciesCount; ++j)
+        {
+            forces[4 * (i * speciesCount + j) + 0] = systemDescription.species[i].forces[j].strength;
+            forces[4 * (i * speciesCount + j) + 1] = systemDescription.species[i].forces[j].radius;
+            forces[4 * (i * speciesCount + j) + 2] = systemDescription.species[i].forces[j].collisionStrength;
+            forces[4 * (i * speciesCount + j) + 3] = systemDescription.species[i].forces[j].collisionRadius;
+        }
+    }
+    
+    device.queue.writeBuffer(forcesBuffer, 0, forces);
+}
+
 function loadSystem(systemDescription)
 {
     currentSystemDescription = systemDescription;
@@ -749,7 +765,18 @@ function loadSystem(systemDescription)
     particleCount = systemDescription.particleCount;
     speciesCount = systemDescription.species.length;
 
+    if (systemDescription.friction == undefined)
+        systemDescription.friction = 10.0;
+
+    if (systemDescription.centralForce == undefined)
+        systemDescription.centralForce = 0.0;
+
+    if (systemDescription.symmetricForces == undefined)
+        systemDescription.symmetricForces = false;
+
     friction = systemDescription.friction;
+    centralForce = systemDescription.centralForce;
+    symmetricForces = systemDescription.symmetricForces;
 
     document.getElementById("particleCountSlider").value = Math.round(Math.log2(particleCount));
     document.getElementById("particleCountText").innerText = `${particleCount} particles`;
@@ -787,24 +814,12 @@ function loadSystem(systemDescription)
     
     device.queue.writeBuffer(speciesBuffer, 0, species);
 
-    const forces = new Float32Array(speciesCount * speciesCount * 4);
-    for (var i = 0; i < speciesCount; ++i)
-    {
-        for (var j = 0; j < speciesCount; ++j)
-        {
-            forces[4 * (i * speciesCount + j) + 0] = systemDescription.species[i].forces[j].strength;
-            forces[4 * (i * speciesCount + j) + 1] = systemDescription.species[i].forces[j].radius;
-            forces[4 * (i * speciesCount + j) + 2] = systemDescription.species[i].forces[j].collisionStrength;
-            forces[4 * (i * speciesCount + j) + 3] = systemDescription.species[i].forces[j].collisionRadius;
-        }
-    }
-
     forcesBuffer = device.createBuffer({
         size: speciesCount * speciesCount * 16,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
-    
-    device.queue.writeBuffer(forcesBuffer, 0, forces);
+
+    reloadForces(systemDescription);
 
     const initialParticles = new Float32Array(particleCount * 5);
 
@@ -1003,6 +1018,32 @@ function loadSystem(systemDescription)
     });
 }
 
+function symmetrizeForces(systemDescription)
+{
+    const speciesCount = systemDescription.species.length;
+
+    for (var i = 0; i < speciesCount; ++i) {
+        for (var j = i + 1; j < speciesCount; ++j) {
+            const forceij = systemDescription.species[i].forces[j];
+            const forceji = systemDescription.species[j].forces[i];
+
+            const strength = (forceij.strength + forceji.strength) / 2.0;
+            const radius = (forceij.radius + forceji.radius) / 2.0;
+            const collisionStrength = (forceij.collisionStrength + forceji.collisionStrength) / 2.0;
+            const collisionRadius = (forceij.collisionRadius + forceji.collisionRadius) / 2.0;
+
+            forceij.strength = strength;
+            forceji.strength = strength;
+            forceij.radius = radius;
+            forceji.radius = radius;
+            forceij.collisionStrength = collisionStrength;
+            forceji.collisionStrength = collisionStrength;
+            forceij.collisionRadius = collisionRadius;
+            forceji.collisionRadius = collisionRadius;
+        }
+    }
+}
+
 function randomizeSystem(systemDescription)
 {
     const speciesCount = systemDescription.species.length;
@@ -1037,6 +1078,10 @@ function randomizeSystem(systemDescription)
         });
     }
 
+    if (systemDescription.symmetricForces) {
+        symmetrizeForces(systemDescription);
+    }
+
     return systemDescription;
 }
 
@@ -1047,6 +1092,8 @@ function initialSystem()
         species: new Array(speciesCount),
         simulationSize: [1600.0, 900.0],
         friction: friction,
+        centralForce: centralForce,
+        symmetricForces: symmetricForces,
     };
     return randomizeSystem(systemDescription);
 }
@@ -1779,6 +1826,30 @@ function updateFriction()
     document.getElementById("frictionText").innerText = `Friction: ${newFriction}`;
 }
 
+function updateCentralForce()
+{
+    const newCentralForce = document.getElementById("centralForceSlider").value / 10.0;
+
+    currentSystemDescription.centralForce = newCentralForce;
+    centralForce = newCentralForce;
+
+    document.getElementById("centralForceText").innerText = `Central force: ${newCentralForce}`;
+}
+
+function updateSymmetricForces()
+{
+    const newSymmetricForces = document.getElementById("symmetricForces").checked;
+
+    currentSystemDescription.symmetricForces = newSymmetricForces;
+    symmetricForces = newSymmetricForces;
+
+    if (newSymmetricForces)
+    {
+        symmetrizeForces(currentSystemDescription);
+        reloadForces(currentSystemDescription);
+    }
+}
+
 async function saveSettings()
 {
     const handle = await window.showSaveFilePicker({
@@ -1873,8 +1944,9 @@ async function loadSettings()
                 display: block;
                 position: relative;
                 cursor: pointer;
-                padding-left: 32px;
-                padding-top: 4px;
+                padding-left: 28px;
+                padding-top: 14px;
+                padding-bottom: 10px;
                 -webkit-user-select: none;
                 -moz-user-select: none;
                 -ms-user-select: none;
@@ -1883,19 +1955,17 @@ async function loadSettings()
 
             .customCheckbox {
                 position: absolute;
-                top: 0px;
+                top: 12px;
                 left: 0px;
-                height: 24px;
-                width: 24px;
+                height: 20px;
+                width: 20px;
                 background-color: #eee;
                 border-radius: 4px;
             }
 
-            .checkboxContainer input:active ~ .customCheckbox{
-                top: 1px;
+            .checkboxContainer input:active ~ .customCheckbox {
+                top: 13px;
                 left: 1px;
-                height: 22px;
-                width: 22px;
             }
 
             .checkboxContainer:hover input ~ .customCheckbox {
@@ -1921,8 +1991,8 @@ async function loadSettings()
             }
 
             .checkboxContainer .customCheckbox:after {
-                left: 8px;
-                top: 4px;
+                left: 6px;
+                top: 2px;
                 width: 5px;
                 height: 10px;
                 border: solid white;
@@ -1930,11 +2000,6 @@ async function loadSettings()
                 -webkit-transform: rotate(45deg);
                 -ms-transform: rotate(45deg);
                 transform: rotate(45deg);
-            }
-
-            .checkboxContainer input:active ~ .customCheckbox:after {
-                left: 7px;
-                top: 3px;
             }
 
             .button {
@@ -2023,6 +2088,16 @@ async function loadSettings()
                 <span id="frictionText">Friction: 10</span>
             </div>
             <div class="rowBreak"></div>
+            <div class="sliderContainer">
+                <input type="range" min="0" max="100" value="0" class="slider" id="centralForceSlider" oninput="updateCentralForce()">
+                <span id="centralForceText">Central force: 0</span>
+            </div>
+            <div class="rowBreak"></div>
+            <label class="checkboxContainer">
+                Symmetric forces
+                <input type="checkbox" id="symmetricForces" onclick="updateSymmetricForces();" />
+                <span class="customCheckbox"></span>
+            </label>
             <div class="rowBreak"></div>
             <table id="buttonsTable">
                 <tr>
@@ -2041,12 +2116,6 @@ async function loadSettings()
             
             <div class="rowBreak"></div>
             <div><center>[S] or three-tap to hide this menu</center></div>
-<!--             <div class="rowBreak"></div>
-            <label class="checkboxContainer">
-                Central force
-                <input type="checkbox" id="centralForce" />
-                <span class="customCheckbox"></span>
-            </div> -->
         </div>
     </body>
 </html>
