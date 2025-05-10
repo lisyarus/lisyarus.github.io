@@ -1061,7 +1061,7 @@ function randomizeSystem(systemDescription)
         var forces = [];
         for (var j = 0; j < speciesCount; ++j) {
             const strength = maxForceStrength * (0.25 + 0.75 * Math.random()) * (Math.random() < 0.5 ? 1.0 : -1.0);
-            const collisionStrength = (5.0 + 15.0 * Math.random()) * strength;
+            const collisionStrength = (5.0 + 15.0 * Math.random()) * Math.abs(strength);
             const radius = 2.0 + Math.random() * (maxForceRadius - 2.0);
             const collisionRadius = Math.random() * 0.5 * radius;
             forces.push({
