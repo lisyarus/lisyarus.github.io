@@ -823,13 +823,32 @@ function loadSystem(systemDescription)
 
     const initialParticles = new Float32Array(particleCount * 5);
 
+    for (var i = 0; i < speciesCount; ++i)
+        if (systemDescription.species[i].spawnWeight == undefined)
+            systemDescription.species[i].spawnWeight = 1.0;
+
+    var speciesWeightSum = 0.0;
+    for (var i = 0; i < speciesCount; ++i)
+        speciesWeightSum += systemDescription.species[i].spawnWeight;
+
     for (var i = 0; i < particleCount; ++i)
     {
+        var speciesPick = Math.random() * speciesWeightSum;
+
+        var speciesId = speciesCount - 1;
+        for (var j = 0; j < speciesCount; ++j) {
+            if (speciesPick < systemDescription.species[j].spawnWeight) {
+                speciesId = j;
+                break;
+            }
+            speciesPick -= systemDescription.species[j].spawnWeight;
+        }
+
         initialParticles[5 * i + 0] = simulationBox[0][0] + Math.random() * (simulationBox[0][1] - simulationBox[0][0]);
         initialParticles[5 * i + 1] = simulationBox[1][0] + Math.random() * (simulationBox[1][1] - simulationBox[1][0]);
         initialParticles[5 * i + 2] = initialVelocity * (-1.0 + Math.random() * 2.0);
         initialParticles[5 * i + 3] = initialVelocity * (-1.0 + Math.random() * 2.0);
-        initialParticles[5 * i + 4] = Math.floor(Math.random() * speciesCount);
+        initialParticles[5 * i + 4] = speciesId;
     }
 
     particleBuffer = device.createBuffer({
@@ -1075,6 +1094,7 @@ function randomizeSystem(systemDescription)
         systemDescription.species.push({
             color: color,
             forces: forces,
+            spawnWeight: Math.random(),
         });
     }
 
