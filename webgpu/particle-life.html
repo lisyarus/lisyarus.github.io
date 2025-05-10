@@ -72,6 +72,7 @@ struct SimulationOptions
     binSize : f32,
     speciesCount : f32,
     centralForce : f32,
+    continuousWorld : f32,
 }
 
 struct BinInfo
@@ -209,7 +210,7 @@ ${simulationOptionsDescription}
 @compute @workgroup_size(64)
 fn computeForces(@builtin(global_invocation_id) id : vec3u)
 {
-    if (id.x >= arrayLength(&particles)) {
+ if (id.x >= arrayLength(&particles)) {
         return;
     }
 
@@ -227,30 +228,87 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
     var totalForce = vec2f(0.0, 0.0);
 
     totalForce -= vec2f(particle.x, particle.y) * simulationOptions.centralForce;
+    
+    if (simulationOptions.continuousWorld > 0.5) {
+        let gridSizeX = binInfo.gridSize.x; 
+        let gridSizeY = binInfo.gridSize.y;
+        let worldWidth = simulationOptions.right - simulationOptions.left;
+        let worldHeight = simulationOptions.top - simulationOptions.bottom;
+        let halfWorldWidth = worldWidth * 0.5;
+        let halfWorldHeight = worldHeight * 0.5;
+    
+        for (var dy = -1; dy <= 1; dy += 1) {
+            for (var dx = -1; dx <= 1; dx += 1) {
+                let neighborBinX = binInfo.binId.x + dx;
+                let neighborBinY = binInfo.binId.y + dy;
 
-    for (var binX = binXMin; binX <= binXMax; binX += 1) {
-        for (var binY = binYMin; binY <= binYMax; binY += 1) {
-            let binIndex = binY * binInfo.gridSize.x + binX;
-            let binStart = binOffset[binIndex];
-            let binEnd = binOffset[binIndex + 1];
+                // Aplly wrap-around 
+                let wrappedBinX = (neighborBinX + gridSizeX) % gridSizeX;
+                let wrappedBinY = (neighborBinY + gridSizeY) % gridSizeY;
+                
+                let binIndex = wrappedBinY * gridSizeX + wrappedBinX;
+                let binStart = binOffset[binIndex];
+                let binEnd = binOffset[binIndex + 1];
 
-            for (var j = binStart; j < binEnd; j += 1) {
-                if (j == id.x) {
-                    continue;
+                for (var j = binStart; j < binEnd; j += 1) {
+                    if (j == id.x) { 
+                        continue;
+                    }
+
+                    let other = particles[j];
+                    let otherSpecies = u32(other.species);
+
+                    let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
+                    var deltaPos = vec2f(other.x - particle.x, other.y - particle.y);
+
+                    if (deltaPos.x > halfWorldWidth) {
+                        deltaPos.x -= worldWidth;
+                    } else if (deltaPos.x < -halfWorldWidth) {
+                        deltaPos.x += worldWidth;
+                    }
+
+                    if (deltaPos.y > halfWorldHeight) {
+                        deltaPos.y -= worldHeight;
+                    } else if (deltaPos.y < -halfWorldHeight) {
+                        deltaPos.y += worldHeight;
+                    }
+                    
+                    let d = length(deltaPos);
+                    if (d > 0.0) { 
+                        let n = deltaPos / d; 
+
+                        totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
+                        totalForce -= force.collisionStrength * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                    }
                 }
+            }
+        }
+    }
+    else{
+        for (var binX = binXMin; binX <= binXMax; binX += 1) {
+            for (var binY = binYMin; binY <= binYMax; binY += 1) {
+                let binIndex = binY * binInfo.gridSize.x + binX;
+                let binStart = binOffset[binIndex];
+                let binEnd = binOffset[binIndex + 1];
 
-                let other = particles[j];
-                let otherSpecies = u32(other.species);
+                for (var j = binStart; j < binEnd; j += 1) {
+                    if (j == id.x) {
+                        continue;
+                    }
 
-                let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
+                    let other = particles[j];
+                    let otherSpecies = u32(other.species);
 
-                let r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
-                let d = length(r);
-                if (d > 0.0) {
-                    let n = r / d;
+                    let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
 
-                    totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
-                    totalForce -= force.collisionStrength * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                    let r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
+                    let d = length(r);
+                    if (d > 0.0) {
+                        let n = r / d;
+
+                        totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
+                        totalForce -= force.collisionStrength * max(0.0, 1.0 - d / force.collisionRadius) * n;
+                    }
                 }
             }
         }
@@ -288,24 +346,41 @@ fn particleAdvance(@builtin(global_invocation_id) id : vec3u)
     particle.x += particle.vx * simulationOptions.dt;
     particle.y += particle.vy * simulationOptions.dt;
 
-    if (particle.x < simulationOptions.left) {
-        particle.x = simulationOptions.left;
-        particle.vx *= -1.0;
-    }
+    if (simulationOptions.continuousWorld > 0.5) { // Use > 0.5 as boolean
+        let worldWidth = simulationOptions.right - simulationOptions.left;
+        let worldHeight = simulationOptions.top - simulationOptions.bottom;
 
-    if (particle.x > simulationOptions.right) {
-        particle.x = simulationOptions.right;
-        particle.vx *= -1.0;
-    }
+        if (particle.x < simulationOptions.left) {
+            particle.x += worldWidth;
+        } else if (particle.x > simulationOptions.right) {
+            particle.x -= worldWidth;
+        }
 
-    if (particle.y < simulationOptions.bottom) {
-        particle.y = simulationOptions.bottom;
-        particle.vy *= -1.0;
-    }
+        if (particle.y < simulationOptions.bottom) {
+            particle.y += worldHeight;
+        } else if (particle.y > simulationOptions.top) {
+            particle.y -= worldHeight;
+        }
+    } else { 
+        if (particle.x < simulationOptions.left) {
+            particle.x = simulationOptions.left;
+            particle.vx *= -1.0;
+        }
 
-    if (particle.y > simulationOptions.top) {
-        particle.y = simulationOptions.top;
-        particle.vy *= -1.0;
+        if (particle.x > simulationOptions.right) {
+            particle.x = simulationOptions.right;
+            particle.vx *= -1.0;
+        }
+
+        if (particle.y < simulationOptions.bottom) {
+            particle.y = simulationOptions.bottom;
+            particle.vy *= -1.0;
+        }
+
+        if (particle.y > simulationOptions.top) {
+            particle.y = simulationOptions.top;
+            particle.vy *= -1.0;
+        }
     }
 
     particles[id.x] = particle;
@@ -534,6 +609,7 @@ var particleCount = 65536;
 var simulationBox = [[-800, 800], [-450, 450]];
 var friction = 10.0;
 var centralForce = 0.0;
+var continuousWorld = 1.0;
 var symmetricForces = false;
 var gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
 var binCount = gridSize[0] * gridSize[1];
@@ -642,7 +718,7 @@ function redraw()
 
     const frictionFactor = Math.exp(- simDt * friction);
 
-    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce]));
+    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce, continuousWorld ]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
  
     const encoder = device.createCommandEncoder({});
@@ -776,6 +852,7 @@ function loadSystem(systemDescription)
 
     friction = systemDescription.friction;
     centralForce = systemDescription.centralForce;
+    continuousWorld = systemDescription.continuousWorld;
     symmetricForces = systemDescription.symmetricForces;
 
     document.getElementById("particleCountSlider").value = Math.round(Math.log2(particleCount));
@@ -1093,6 +1170,7 @@ function initialSystem()
         simulationSize: [1600.0, 900.0],
         friction: friction,
         centralForce: centralForce,
+        continuousWorld: continuousWorld,
         symmetricForces: symmetricForces,
     };
     return randomizeSystem(systemDescription);
@@ -1306,7 +1384,7 @@ async function init()
     });
 
     simulationOptionsBuffer = device.createBuffer({
-        size: 36,
+        size: 40, //increased to 40 to handle continuous world
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
@@ -1836,6 +1914,12 @@ function updateCentralForce()
     document.getElementById("centralForceText").innerText = `Central force: ${newCentralForce}`;
 }
 
+function updateContinuousWorld(){
+    const newContinuousWorld = document.getElementById("continuousWorld").checked;
+    currentSystemDescription.continuousWorld = newContinuousWorld;
+    continuousWorld = newContinuousWorld;
+}
+
 function updateSymmetricForces()
 {
     const newSymmetricForces = document.getElementById("symmetricForces").checked;
@@ -2096,6 +2180,12 @@ async function loadSettings()
             <label class="checkboxContainer">
                 Symmetric forces
                 <input type="checkbox" id="symmetricForces" onclick="updateSymmetricForces();" />
+                <span class="customCheckbox"></span>
+            </label>
+            <div class="rowBreak"></div>
+            <label class="checkboxContainer">
+                Continuous world
+                <input type="checkbox" id="continuousWorld" onclick="updateContinuousWorld();" checked />
                 <span class="customCheckbox"></span>
             </label>
             <div class="rowBreak"></div>
