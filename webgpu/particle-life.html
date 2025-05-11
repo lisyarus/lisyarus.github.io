@@ -1107,10 +1107,14 @@ function randomizeSystem(systemDescription)
 
 function initialSystem()
 {
+    const aspectRatio = window.screen.width / window.screen.height;
+    const width = Math.round(12 * Math.sqrt(aspectRatio)) * 100;
+    const height = Math.round(width / 100 / aspectRatio) * 100;
+
     const systemDescription = {
         particleCount: particleCount,
         species: new Array(speciesCount),
-        simulationSize: [1600.0, 900.0],
+        simulationSize: [width, height],
         friction: friction,
         centralForce: centralForce,
         symmetricForces: symmetricForces,
@@ -1803,6 +1807,7 @@ async function init()
     resize();
 
     loadSystem(initialSystem());
+    centerView();
 
     redraw();
 }
