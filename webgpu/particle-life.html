@@ -525,6 +525,8 @@ var device;
 
 const hdrFormat = 'rgba16float';
 
+var timestampQuerySupported = true;
+
 const maxForceRadius = 32.0;
 const maxForceStrength = 100.0;
 const initialVelocity = 10.0;
@@ -606,6 +608,47 @@ var framesInFlight = 0;
 
 var paused = false;
 var toolsPanelShown = true;
+var debugPanelShown = false;
+
+var freeQueryHelpers = [];
+
+function QueryHelper()
+{
+    this.querySet = device.createQuerySet({
+        count: 16,
+        type: 'timestamp',
+    });
+
+    this.resolveBuffer = device.createBuffer({
+        size: 8 * 16,
+        usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.QUERY_RESOLVE,
+    });
+
+    this.readBuffer = device.createBuffer({
+        size: 8 * 16,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    this.currentIndex = 0;
+    this.start = () => this.currentIndex = 0;
+    this.next = () => {
+        const result = {
+            querySet: this.querySet,
+            beginningOfPassWriteIndex: this.currentIndex,
+            endOfPassWriteIndex: this.currentIndex + 1,
+        };
+        this.currentIndex += 2;
+        return result;
+    };
+}
+
+function formatExecutionTime(x) {
+    var result = (Number(x) / 1000000).toFixed(2);
+    while (result.length < 5) {
+        result = " " + result;
+    }
+    return result;
+}
 
 function redraw()
 {
@@ -638,50 +681,81 @@ function redraw()
     toolsPanel.style.opacity = toolsPanelAlpha;
     toolsPanel.style.visibility = (toolsPanelAlpha < 0.01) ? "hidden" : "visible";
 
+    const debugPanel = document.getElementById("debugPanel");
+    var debugPanelAlpha = Number(debugPanel.style.opacity);
+    debugPanelAlpha += ((debugPanelShown ? 1.0 : 0.0) - debugPanelAlpha) * (- Math.expm1(- 20 * dt));
+    debugPanel.style.opacity = debugPanelAlpha;
+    debugPanel.style.visibility = (debugPanelAlpha < 0.01) ? "hidden" : "visible";
+
     const simDt = Math.min(0.025, dt);
 
     const frictionFactor = Math.exp(- simDt * friction);
 
     device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
+
+    var queryHelper;
+    if (timestampQuerySupported) {
+        if (freeQueryHelpers.length > 0) {
+            queryHelper = freeQueryHelpers.pop();
+        } else {
+            queryHelper = new QueryHelper();
+        }
+        queryHelper.start();
+    }
  
     const encoder = device.createCommandEncoder({});
 
     if (!paused) {
         encoder.copyBufferToBuffer(particleBuffer, 0, particleTempBuffer, 0, particleBuffer.size);
 
-        const computePass = encoder.beginComputePass({});
+        const binningComputePass = encoder.beginComputePass({
+            ...(timestampQuerySupported) && {timestampWrites: queryHelper.next()},
+        });
 
-        computePass.setBindGroup(1, simulationOptionsBindGroup);
+        binningComputePass.setBindGroup(0, particleBufferReadOnlyBindGroup);
+        binningComputePass.setBindGroup(1, simulationOptionsBindGroup);
+        binningComputePass.setBindGroup(2, binFillSizeBindGroup);
+        binningComputePass.setPipeline(binClearSizePipeline);
+        binningComputePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
+        binningComputePass.setPipeline(binFillSizePipeline);
+        binningComputePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
 
-        computePass.setBindGroup(0, particleBufferReadOnlyBindGroup);
-        computePass.setBindGroup(2, binFillSizeBindGroup);
-        computePass.setPipeline(binClearSizePipeline);
-        computePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
-        computePass.setPipeline(binFillSizePipeline);
-        computePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
-
-        computePass.setPipeline(binPrefixSumPipeline);
+        binningComputePass.setPipeline(binPrefixSumPipeline);
         for (var i = 0; i < prefixSumIterations; ++i) {
-            computePass.setBindGroup(0, binPrefixSumBindGroup[i % 2], [i * 256]);
-            computePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
+            binningComputePass.setBindGroup(0, binPrefixSumBindGroup[i % 2], [i * 256]);
+            binningComputePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
         }
 
-        computePass.setBindGroup(0, particleSortBindGroup);
-        computePass.setPipeline(particleSortClearSizePipeline);
-        computePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
-        computePass.setPipeline(particleSortPipeline);
-        computePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+        binningComputePass.setBindGroup(0, particleSortBindGroup);
+        binningComputePass.setPipeline(particleSortClearSizePipeline);
+        binningComputePass.dispatchWorkgroups(Math.ceil((binCount + 1) / 64));
+        binningComputePass.setPipeline(particleSortPipeline);
+        binningComputePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
 
-        computePass.setBindGroup(0, particleComputeForcesBindGroup);
-        computePass.setPipeline(particleComputeForcesPipeline);
-        computePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+        binningComputePass.end();
 
-        computePass.setBindGroup(0, particleBufferBindGroup);
-        computePass.setPipeline(particleAdvancePipeline);
-        computePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+        const forcesComputePass = encoder.beginComputePass({
+            ...(timestampQuerySupported) && {timestampWrites: queryHelper.next()},
+        });
 
-        computePass.end();
+        forcesComputePass.setBindGroup(0, particleComputeForcesBindGroup);
+        forcesComputePass.setBindGroup(1, simulationOptionsBindGroup);
+        forcesComputePass.setPipeline(particleComputeForcesPipeline);
+        forcesComputePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+
+        forcesComputePass.end();
+
+        const advanceComputePass = encoder.beginComputePass({
+            ...(timestampQuerySupported) && {timestampWrites: queryHelper.next()},
+        });
+
+        advanceComputePass.setBindGroup(0, particleBufferBindGroup);
+        advanceComputePass.setBindGroup(1, simulationOptionsBindGroup);
+        advanceComputePass.setPipeline(particleAdvancePipeline);
+        advanceComputePass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+
+        advanceComputePass.end();
     }
  
     const hdrRenderPass = encoder.beginRenderPass({
@@ -693,6 +767,19 @@ function redraw()
                 storeOp: 'store',
             },
         ],
+        ...(timestampQuerySupported) && {timestampWrites: queryHelper.next()},
+        // timestampWrites: [
+        //     {
+        //         location: 'beginning',
+        //         querySet: queryHelper.querySet,
+        //         queryIndex: 6,
+        //     },
+        //     {
+        //         location: 'end',
+        //         querySet: queryHelper.querySet,
+        //         queryIndex: 7,
+        //     },
+        // ],
     });
     hdrRenderPass.setBindGroup(0, particleBufferReadOnlyBindGroup);
     hdrRenderPass.setBindGroup(1, cameraBindGroup);
@@ -716,14 +803,35 @@ function redraw()
                 storeOp: 'store',
             },
         ],
+        ...(timestampQuerySupported) && {timestampWrites: queryHelper.next()},
     });
     composeRenderPass.setBindGroup(0, composeBindGroup);
     composeRenderPass.setPipeline(composePipeline);
     composeRenderPass.draw(3);
     composeRenderPass.end();
+
+    if (timestampQuerySupported) {
+        encoder.resolveQuerySet(queryHelper.querySet, 0, queryHelper.querySet.count, queryHelper.resolveBuffer, 0);
+        encoder.copyBufferToBuffer(queryHelper.resolveBuffer, 0, queryHelper.readBuffer, 0, queryHelper.resolveBuffer.size);
+    }
  
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
+
+    if (timestampQuerySupported) {
+        queryHelper.readBuffer.mapAsync(GPUMapMode.READ).then(() => {
+            const values = new BigUint64Array(queryHelper.readBuffer.getMappedRange());
+            var debugText = "";
+            debugText += "Binning: " + formatExecutionTime(values[1] - values[0]) + " ms\n";
+            debugText += "Forces:  " + formatExecutionTime(values[3] - values[2]) + " ms\n";
+            debugText += "Advance: " + formatExecutionTime(values[5] - values[4]) + " ms\n";
+            debugText += "Render:  " + formatExecutionTime(values[7] - values[6]) + " ms\n";
+            debugText += "Compose: " + formatExecutionTime(values[9] - values[8]) + " ms\n";
+            document.getElementById("debugInfo").innerText = debugText;
+            queryHelper.readBuffer.unmap();
+            freeQueryHelpers.push(queryHelper);
+        });
+    }
 
     ++framesInFlight;
 
@@ -1299,6 +1407,11 @@ async function init()
             toolsPanelShown = !toolsPanelShown;
             event.preventDefault();
         }
+
+        if (event.key == 'd') {
+            debugPanelShown = !debugPanelShown;
+            event.preventDefault();
+        }
     }, false);
 
     if (!navigator) {
@@ -1318,7 +1431,11 @@ async function init()
         return;
     }
 
-    device = await adapter?.requestDevice();
+    timestampQuerySupported = adapter.features.has('timestamp-query');
+
+    device = await adapter?.requestDevice({
+        requiredFeatures: timestampQuerySupported ? ['timestamp-query'] : [],
+    });
 
     if (!device) {
         alert("Your browser doesn't support WebGPU (failed to create device)");
@@ -1949,6 +2066,16 @@ async function loadSettings()
                 top: 24px;
             }
 
+            #debugPanel {
+                position: fixed;
+                right: 24px;
+                top: 24px;
+            }
+
+            #debugInfo {
+                white-space: pre;
+            }
+
             a {
                 color: #bbb;
                 text-decoration: none;
@@ -2149,6 +2276,9 @@ async function loadSettings()
             
             <div class="rowBreak"></div>
             <div><center>[S] or three-tap to hide this menu</center></div>
+        </div>
+        <div id="debugPanel" class="panel">
+            <div id="debugInfo">Debug info</div>
         </div>
     </body>
 </html>
