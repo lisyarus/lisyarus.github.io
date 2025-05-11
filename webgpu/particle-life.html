@@ -200,20 +200,21 @@ ${particleDescription}
 ${forceDescription}
 ${simulationOptionsDescription}
 
-@group(0) @binding(0) var<storage, read_write> particles : array<Particle>;
-@group(0) @binding(1) var<storage, read> binOffset : array<u32>;
-@group(0) @binding(2) var<storage, read> forces : array<Force>;
+@group(0) @binding(0) var<storage, read> particlesSource : array<Particle>;
+@group(0) @binding(1) var<storage, read_write> particlesDestination : array<Particle>;
+@group(0) @binding(2) var<storage, read> binOffset : array<u32>;
+@group(0) @binding(3) var<storage, read> forces : array<Force>;
 
 @group(1) @binding(0) var<uniform> simulationOptions : SimulationOptions;
 
 @compute @workgroup_size(64)
 fn computeForces(@builtin(global_invocation_id) id : vec3u)
 {
-    if (id.x >= arrayLength(&particles)) {
+    if (id.x >= arrayLength(&particlesSource)) {
         return;
     }
 
-    var particle = particles[id.x];
+    var particle = particlesSource[id.x];
     let species = u32(particle.species);
 
     let binInfo = getBinInfo(vec2f(particle.x, particle.y), simulationOptions);
@@ -239,7 +240,7 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
                     continue;
                 }
 
-                let other = particles[j];
+                let other = particlesSource[j];
                 let otherSpecies = u32(other.species);
 
                 let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
@@ -260,7 +261,7 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
     particle.vx += totalForce.x * simulationOptions.dt;
     particle.vy += totalForce.y * simulationOptions.dt;
 
-    particles[id.x] = particle;
+    particlesDestination[id.x] = particle;
 }
 `;
 
@@ -1096,13 +1097,13 @@ function loadSystem(systemDescription)
             {
                 binding: 0,
                 resource: {
-                    buffer: particleTempBuffer,
+                    buffer: particleBuffer,
                 },
             },
             {
                 binding: 1,
                 resource: {
-                    buffer: particleBuffer,
+                    buffer: particleTempBuffer,
                 },
             },
             {
@@ -1126,17 +1127,23 @@ function loadSystem(systemDescription)
             {
                 binding: 0,
                 resource: {
-                    buffer: particleBuffer,
+                    buffer: particleTempBuffer,
                 },
             },
             {
                 binding: 1,
                 resource: {
-                    buffer: binOffsetBuffer,
+                    buffer: particleBuffer,
                 },
             },
             {
                 binding: 2,
+                resource: {
+                    buffer: binOffsetBuffer,
+                },
+            },
+            {
+                binding: 3,
                 resource: {
                     buffer: forcesBuffer,
                 },
@@ -1651,18 +1658,25 @@ async function init()
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
-                    type: 'storage',
+                    type: 'read-only-storage',
                 },
             },
             {
                 binding: 1,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
-                    type: 'read-only-storage',
+                    type: 'storage',
                 },
             },
             {
                 binding: 2,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: {
+                    type: 'read-only-storage',
+                },
+            },
+            {
+                binding: 3,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
                     type: 'read-only-storage',
