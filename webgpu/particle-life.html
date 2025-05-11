@@ -1161,6 +1161,14 @@ async function init()
     const toolsPanelStyle = window.getComputedStyle(document.getElementById("toolsPanel"), null);
     buttonsTable.style.width = buttonsTable.parentElement.clientWidth - parseFloat(toolsPanelStyle.getPropertyValue('padding-left')) - parseFloat(toolsPanelStyle.getPropertyValue('padding-right'));
 
+    for (var element of document.getElementsByClassName('slider')) {
+        const self = element;
+        self.addEventListener('wheel', function(event) {
+            self.value = Number(self.value) + event.deltaY / 120;
+            self.dispatchEvent(new Event('input'));
+        });
+    }
+
     canvas = document.getElementById("mainCanvas");
 
     canvas.addEventListener('wheel', function(event) {
