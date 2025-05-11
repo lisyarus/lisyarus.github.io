@@ -1168,7 +1168,7 @@ async function init()
     for (var element of document.getElementsByClassName('slider')) {
         const self = element;
         self.addEventListener('wheel', function(event) {
-            self.value = Number(self.value) + event.deltaY / 120;
+            self.value = Number(self.value) - event.deltaY / 120;
             self.dispatchEvent(new Event('input'));
         });
     }
