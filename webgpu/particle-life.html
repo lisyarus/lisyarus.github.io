@@ -647,7 +647,7 @@ function formatExecutionTime(x) {
     while (result.length < 5) {
         result = " " + result;
     }
-    return result;
+    return result + " ms";
 }
 
 function redraw()
@@ -822,11 +822,11 @@ function redraw()
         queryHelper.readBuffer.mapAsync(GPUMapMode.READ).then(() => {
             const values = new BigUint64Array(queryHelper.readBuffer.getMappedRange());
             var debugText = "";
-            debugText += "Binning: " + formatExecutionTime(values[1] - values[0]) + " ms\n";
-            debugText += "Forces:  " + formatExecutionTime(values[3] - values[2]) + " ms\n";
-            debugText += "Advance: " + formatExecutionTime(values[5] - values[4]) + " ms\n";
-            debugText += "Render:  " + formatExecutionTime(values[7] - values[6]) + " ms\n";
-            debugText += "Compose: " + formatExecutionTime(values[9] - values[8]) + " ms\n";
+            debugText += "Binning: " + (paused ? " -------" : formatExecutionTime(values[1] - values[0])) + "\n";
+            debugText += "Forces:  " + (paused ? " -------" : formatExecutionTime(values[3] - values[2])) + "\n";
+            debugText += "Advance: " + (paused ? " -------" : formatExecutionTime(values[5] - values[4])) + "\n";
+            debugText += "Render:  " + formatExecutionTime(values[7] - values[6]) + "\n";
+            debugText += "Compose: " + formatExecutionTime(values[9] - values[8]) + "\n";
             document.getElementById("debugInfo").innerText = debugText;
             queryHelper.readBuffer.unmap();
             freeQueryHelpers.push(queryHelper);
