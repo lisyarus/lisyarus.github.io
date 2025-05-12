@@ -917,7 +917,13 @@ function centerView()
 {
     cameraCenter = [0.0, 0.0];
     zoomAnchor = null;
-    cameraExtentXTarget = simulationBox[0][1];
+
+    const aspectRatio = document.body.clientWidth / document.body.clientHeight;
+
+    if ((simulationBox[0][1] - simulationBox[0][0]) / (simulationBox[1][1] - simulationBox[1][0]) > aspectRatio)
+        cameraExtentXTarget = simulationBox[0][1];
+    else
+        cameraExtentXTarget = simulationBox[1][1] * aspectRatio;
 }
 
 function reloadForces(systemDescription)
