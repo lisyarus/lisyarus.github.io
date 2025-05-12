@@ -72,6 +72,7 @@ struct SimulationOptions
     binSize : f32,
     speciesCount : f32,
     centralForce : f32,
+    loopingBorders : f32,
 }
 
 struct BinInfo
@@ -219,11 +220,23 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
     let binInfo = getBinInfo(vec2f(particle.x, particle.y), simulationOptions);
 
-    let binXMin = max(0, binInfo.binId.x - 1);
-    let binYMin = max(0, binInfo.binId.y - 1);
+    let loopingBorders = simulationOptions.loopingBorders == 1.0;
 
-    let binXMax = min(binInfo.gridSize.x - 1, binInfo.binId.x + 1);
-    let binYMax = min(binInfo.gridSize.y - 1, binInfo.binId.y + 1);
+    var binXMin = binInfo.binId.x - 1;
+    var binYMin = binInfo.binId.y - 1;
+
+    var binXMax = binInfo.binId.x + 1;
+    var binYMax = binInfo.binId.y + 1;
+
+    if (!loopingBorders) {
+        binXMin = max(0, binXMin);
+        binYMin = max(0, binYMin);
+        binXMax = min(binInfo.gridSize.x - 1, binXMax);
+        binYMax = min(binInfo.gridSize.y - 1, binYMax);
+    }
+
+    let width = simulationOptions.right - simulationOptions.left;
+    let height = simulationOptions.top - simulationOptions.bottom;
 
     var totalForce = vec2f(0.0, 0.0);
 
@@ -231,7 +244,10 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
     for (var binX = binXMin; binX <= binXMax; binX += 1) {
         for (var binY = binYMin; binY <= binYMax; binY += 1) {
-            let binIndex = binY * binInfo.gridSize.x + binX;
+            var realBinX = (binX + binInfo.gridSize.x) % binInfo.gridSize.x;
+            var realBinY = (binY + binInfo.gridSize.y) % binInfo.gridSize.y;
+
+            let binIndex = realBinY * binInfo.gridSize.x + realBinX;
             let binStart = binOffset[binIndex];
             let binEnd = binOffset[binIndex + 1];
 
@@ -245,9 +261,20 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
                 let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
 
-                let r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
+                var r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
+
+                if (loopingBorders) {
+                    if (abs(r.x) >= width * 0.5) {
+                        r.x -= sign(r.x) * width;
+                    }
+
+                    if (abs(r.y) >= height * 0.5) {
+                        r.y -= sign(r.y) * height;
+                    }
+                }
+
                 let d = length(r);
-                if (d > 0.0) {
+                if (d > 0.0 && d < force.radius) {
                     let n = r / d;
 
                     totalForce += force.strength * max(0.0, 1.0 - d / force.radius) * n;
@@ -289,24 +316,47 @@ fn particleAdvance(@builtin(global_invocation_id) id : vec3u)
     particle.x += particle.vx * simulationOptions.dt;
     particle.y += particle.vy * simulationOptions.dt;
 
-    if (particle.x < simulationOptions.left) {
-        particle.x = simulationOptions.left;
-        particle.vx *= -1.0;
-    }
+    let loopingBorders = simulationOptions.loopingBorders == 1.0;
 
-    if (particle.x > simulationOptions.right) {
-        particle.x = simulationOptions.right;
-        particle.vx *= -1.0;
-    }
+    if (loopingBorders) {
+        let width = simulationOptions.right - simulationOptions.left;
+        let height = simulationOptions.top - simulationOptions.bottom;
 
-    if (particle.y < simulationOptions.bottom) {
-        particle.y = simulationOptions.bottom;
-        particle.vy *= -1.0;
-    }
+        if (particle.x < simulationOptions.left) {
+            particle.x += width;
+        }
+    
+        if (particle.x > simulationOptions.right) {
+            particle.x -= width;
+        }
 
-    if (particle.y > simulationOptions.top) {
-        particle.y = simulationOptions.top;
-        particle.vy *= -1.0;
+        if (particle.y < simulationOptions.bottom) {
+            particle.y += height;
+        }
+    
+        if (particle.y > simulationOptions.top) {
+            particle.y -= height;
+        }
+    } else {
+        if (particle.x < simulationOptions.left) {
+            particle.x = simulationOptions.left;
+            particle.vx *= -1.0;
+        }
+
+        if (particle.x > simulationOptions.right) {
+            particle.x = simulationOptions.right;
+            particle.vx *= -1.0;
+        }
+
+        if (particle.y < simulationOptions.bottom) {
+            particle.y = simulationOptions.bottom;
+            particle.vy *= -1.0;
+        }
+
+        if (particle.y > simulationOptions.top) {
+            particle.y = simulationOptions.top;
+            particle.vy *= -1.0;
+        }
     }
 
     particles[id.x] = particle;
@@ -534,10 +584,11 @@ const initialVelocity = 10.0;
 
 var speciesCount = 8;
 var particleCount = 65536;
-var simulationBox = [[-800, 800], [-450, 450]];
+var simulationBox = [[-512, 512], [-288, 288]];
 var friction = 10.0;
 var centralForce = 0.0;
 var symmetricForces = false;
+var loopingBorders = false;
 var gridSize = [Math.ceil((simulationBox[0][1] - simulationBox[0][0]) / maxForceRadius), Math.ceil((simulationBox[1][1] - simulationBox[1][0]) / maxForceRadius)];
 var binCount = gridSize[0] * gridSize[1];
 var prefixSumIterations = Math.ceil(Math.ceil(Math.log2(binCount + 1)) / 2) * 2;
@@ -692,7 +743,7 @@ function redraw()
 
     const frictionFactor = Math.exp(- simDt * friction);
 
-    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce]));
+    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce, loopingBorders ? 1.0 : 0.0]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
 
     var queryHelper;
@@ -859,7 +910,7 @@ function reloadForces(systemDescription)
         {
             forces[4 * (i * speciesCount + j) + 0] = systemDescription.species[i].forces[j].strength;
             forces[4 * (i * speciesCount + j) + 1] = systemDescription.species[i].forces[j].radius;
-            forces[4 * (i * speciesCount + j) + 2] = systemDescription.species[i].forces[j].collisionStrength;
+            forces[4 * (i * speciesCount + j) + 2] = Math.abs(systemDescription.species[i].forces[j].collisionStrength);
             forces[4 * (i * speciesCount + j) + 3] = systemDescription.species[i].forces[j].collisionRadius;
         }
     }
@@ -883,25 +934,30 @@ function loadSystem(systemDescription)
     if (systemDescription.symmetricForces == undefined)
         systemDescription.symmetricForces = false;
 
+    if (systemDescription.loopingBorders == undefined)
+        systemDescription.loopingBorders = false;
+
     friction = systemDescription.friction;
     centralForce = systemDescription.centralForce;
     symmetricForces = systemDescription.symmetricForces;
+    loopingBorders = systemDescription.loopingBorders;
+
+    const W = Math.round(systemDescription.simulationSize[0] / 64) * 32;
+    const H = Math.round(systemDescription.simulationSize[1] / 64) * 32;
+
+    simulationBox = [[-W, W], [-H, H]];
 
     document.getElementById("particleCountSlider").value = Math.round(Math.log2(particleCount));
     document.getElementById("particleCountText").innerText = `${particleCount} particles`;
     document.getElementById("speciesCountSlider").value = speciesCount;
     document.getElementById("speciesCountText").innerText = `${speciesCount} particle types`;
-    document.getElementById("simulationWidthSlider").value = Math.round(systemDescription.simulationSize[0] / 100);
-    document.getElementById("simulationWidthText").innerText = `Width: ${systemDescription.simulationSize[0]}`;
-    document.getElementById("simulationHeightSlider").value = Math.round(systemDescription.simulationSize[1] / 100);
-    document.getElementById("simulationHeightText").innerText = `Height: ${systemDescription.simulationSize[1]}`;
+    document.getElementById("simulationWidthSlider").value = Math.round(systemDescription.simulationSize[0] / 64);
+    document.getElementById("simulationWidthText").innerText = `Width: ${2 * W}`;
+    document.getElementById("simulationHeightSlider").value = Math.round(systemDescription.simulationSize[1] / 64);
+    document.getElementById("simulationHeightText").innerText = `Height: ${2 * H}`;
     document.getElementById("frictionSlider").value = Math.round(friction);
     document.getElementById("frictionText").innerText = `Friction: ${friction}`;
-
-    const W = systemDescription.simulationSize[0] / 2.0;
-    const H = systemDescription.simulationSize[1] / 2.0;
-
-    simulationBox = [[-W, W], [-H, H]];
+    document.getElementById("loopingBorders").checked = loopingBorders;
 
     gridSize = [Math.ceil(systemDescription.simulationSize[0] / maxForceRadius), Math.ceil(systemDescription.simulationSize[1] / maxForceRadius)];
     binCount = gridSize[0] * gridSize[1];
@@ -1223,8 +1279,8 @@ function randomizeSystem(systemDescription)
 function initialSystem()
 {
     const aspectRatio = window.screen.width / window.screen.height;
-    const width = Math.round(12 * Math.sqrt(aspectRatio)) * 100;
-    const height = Math.round(width / 100 / aspectRatio) * 100;
+    const width = Math.round(12 * Math.sqrt(aspectRatio)) * 64;
+    const height = Math.round(width / 64 / aspectRatio) * 64;
 
     const systemDescription = {
         particleCount: particleCount,
@@ -1233,6 +1289,7 @@ function initialSystem()
         friction: friction,
         centralForce: centralForce,
         symmetricForces: symmetricForces,
+        loopingBorders: loopingBorders,
     };
     return randomizeSystem(systemDescription);
 }
@@ -1462,7 +1519,7 @@ async function init()
     });
 
     simulationOptionsBuffer = device.createBuffer({
-        size: 36,
+        size: 40,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
@@ -1972,8 +2029,8 @@ function updateSpeciesCount()
 
 function updateSimulationSize()
 {
-    const newWidth = document.getElementById("simulationWidthSlider").value * 100.0;
-    const newHeight = document.getElementById("simulationHeightSlider").value * 100.0;
+    const newWidth = document.getElementById("simulationWidthSlider").value * 64;
+    const newHeight = document.getElementById("simulationHeightSlider").value * 64;
 
     const systemDescription = currentSystemDescription;
     systemDescription.simulationSize = [newWidth, newHeight];
@@ -2012,6 +2069,14 @@ function updateSymmetricForces()
         symmetrizeForces(currentSystemDescription);
         reloadForces(currentSystemDescription);
     }
+}
+
+function updateLoopingBorders()
+{
+    const newLoopingBorders = document.getElementById("loopingBorders").checked;
+
+    currentSystemDescription.loopingBorders = newLoopingBorders;
+    loopingBorders = newLoopingBorders;
 }
 
 async function saveSettings()
@@ -2249,12 +2314,12 @@ async function loadSettings()
             <div class="rowBreak"></div>
             <div class="sliderContainer">
                 <input type="range" min="1" max="50" value="16" class="slider" id="simulationWidthSlider" oninput="updateSimulationSize();">
-                <span id="simulationWidthText">Width: 1600</span>
+                <span id="simulationWidthText">Width: 1024</span>
             </div>
             <div class="rowBreak"></div>
             <div class="sliderContainer">
                 <input type="range" min="1" max="50" value="9" class="slider" id="simulationHeightSlider" oninput="updateSimulationSize();">
-                <span id="simulationHeightText">Height: 900</span>
+                <span id="simulationHeightText">Height: 576</span>
             </div>
             <div class="rowBreak"></div>
             <div class="sliderContainer">
@@ -2270,6 +2335,11 @@ async function loadSettings()
             <label class="checkboxContainer">
                 Symmetric forces
                 <input type="checkbox" id="symmetricForces" onclick="updateSymmetricForces();" />
+                <span class="customCheckbox"></span>
+            </label>
+            <label class="checkboxContainer">
+                Looping borders
+                <input type="checkbox" id="loopingBorders" onclick="updateLoopingBorders();" />
                 <span class="customCheckbox"></span>
             </label>
             <div class="rowBreak"></div>
