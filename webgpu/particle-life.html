@@ -90,6 +90,12 @@ struct SimulationOptions
     speciesCount : f32,
     centralForce : f32,
     loopingBorders : f32,
+    actionX : f32,
+    actionY : f32,
+    actionVX : f32,
+    actionVY : f32,
+    actionForce : f32,
+    actionRadius : f32,
 }
 
 struct BinInfo
@@ -257,7 +263,9 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
     var totalForce = vec2f(0.0, 0.0);
 
-    totalForce -= vec2f(particle.x, particle.y) * simulationOptions.centralForce;
+    let particlePosition = vec2f(particle.x, particle.y);
+
+    totalForce -= particlePosition * simulationOptions.centralForce;
 
     for (var binX = binXMin; binX <= binXMax; binX += 1) {
         for (var binY = binYMin; binY <= binYMax; binY += 1) {
@@ -278,7 +286,7 @@ fn computeForces(@builtin(global_invocation_id) id : vec3u)
 
                 let force = forces[species * u32(simulationOptions.speciesCount) + otherSpecies];
 
-                var r = vec2f(other.x, other.y) - vec2f(particle.x, particle.y);
+                var r = vec2f(other.x, other.y) - particlePosition;
 
                 if (loopingBorders) {
                     if (abs(r.x) >= width * 0.5) {
@@ -325,7 +333,24 @@ fn particleAdvance(@builtin(global_invocation_id) id : vec3u)
         return;
     }
 
+    let width = simulationOptions.right - simulationOptions.left;
+    let height = simulationOptions.top - simulationOptions.bottom;
+
     var particle = particles[id.x];
+
+    var actionR = vec2f(particle.x, particle.y) - vec2f(simulationOptions.actionX, simulationOptions.actionY);
+    if (simulationOptions.loopingBorders == 1.0) {
+        if (abs(actionR.x) >= width * 0.5) {
+            actionR.x -= sign(actionR.x) * width;
+        }
+
+        if (abs(actionR.y) >= height * 0.5) {
+            actionR.y -= sign(actionR.y) * height;
+        }
+    }
+    let actionFactor = simulationOptions.actionForce * exp(- dot(actionR, actionR) / (simulationOptions.actionRadius * simulationOptions.actionRadius));
+    particle.vx += simulationOptions.actionVX * actionFactor;
+    particle.vy += simulationOptions.actionVY * actionFactor;
 
     particle.vx *= simulationOptions.friction;
     particle.vy *= simulationOptions.friction;
@@ -336,9 +361,6 @@ fn particleAdvance(@builtin(global_invocation_id) id : vec3u)
     let loopingBorders = simulationOptions.loopingBorders == 1.0;
 
     if (loopingBorders) {
-        let width = simulationOptions.right - simulationOptions.left;
-        let height = simulationOptions.top - simulationOptions.bottom;
-
         if (particle.x < simulationOptions.left) {
             particle.x += width;
         }
@@ -671,8 +693,12 @@ var zoomAnchor = null;
 var lastFrameTimestamp = window.performance.now() / 1000.0;
 
 var mouseDrag = null;
+var actionPoint = null;
+var actionDrag = null;
 
 const activeTouches = new Map();
+var lastTouchTime = null;
+var isDoubleTap = false;
 
 var frameID = 0;
 var framesInFlight = 0;
@@ -762,7 +788,16 @@ function redraw()
 
     const frictionFactor = Math.exp(- simDt * friction);
 
-    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce, loopingBorders ? 1.0 : 0.0]));
+    const actionX = actionPoint ? cameraCenter[0] + cameraExtentX * (2.0 * actionPoint[0] / canvas.width - 1.0) : 0.0;
+    const actionY = actionPoint ? cameraCenter[1] + cameraExtentY * (1.0 - 2.0 * actionPoint[1] / canvas.height) : 0.0;
+    const actionVX = actionDrag ? cameraExtentX * (2.0 * actionDrag[0] / canvas.width) : 0.0;
+    const actionVY = actionDrag ? cameraExtentY * (- 2.0 * actionDrag[1] / canvas.height) : 0.0;
+    const actionForce = actionPoint ? 20.0 : 0.0;
+    const actionRadius = 32.0;
+
+    actionDrag = [0.0, 0.0];
+
+    device.queue.writeBuffer(simulationOptionsBuffer, 0, new Float32Array([simulationBox[0][0], simulationBox[0][1], simulationBox[1][0], simulationBox[1][1], frictionFactor, simDt, maxForceRadius, speciesCount, centralForce, loopingBorders ? 1.0 : 0.0, actionX, actionY, actionVX, actionVY, actionForce, actionRadius]));
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([cameraCenter[0], cameraCenter[1], cameraExtentX, cameraExtentY, pixelsPerUnit]));
 
     var queryHelper;
@@ -1427,16 +1462,37 @@ async function init()
     }, false);    
 
     canvas.addEventListener('mousedown', function(event) {
-        mouseDrag = [event.clientX, event.clientY];
+        if (event.button == 0) {
+            actionPoint = [event.clientX, event.clientY];
+            actionDrag = [0.0, 0.0];
+        }
+        if (event.button == 2) {
+            mouseDrag = [event.clientX, event.clientY];
+        }
         event.preventDefault();
     }, false);
 
     canvas.addEventListener('mouseup', function(event) {
-        mouseDrag = null;
+        if (event.button == 0) {
+            actionPoint = null;
+            actionDrag = null;
+        }
+        if (event.button == 2) {
+            mouseDrag = null;
+        }
+        event.preventDefault();
+    }, false);
+
+    canvas.addEventListener('contextmenu', function(event) {
         event.preventDefault();
     }, false);
 
     canvas.addEventListener('mousemove', function(event) {
+        if (actionPoint) {
+            actionDrag = [event.clientX - actionPoint[0], event.clientY - actionPoint[1]];
+            actionPoint = [event.clientX, event.clientY];
+        }
+
         if (mouseDrag) {
             const delta = [event.clientX - mouseDrag[0], event.clientY - mouseDrag[1]];
 
@@ -1445,6 +1501,7 @@ async function init()
 
             mouseDrag = [event.clientX, event.clientY];
         }
+
         event.preventDefault();
     }, false);
 
@@ -1456,6 +1513,16 @@ async function init()
         if (activeTouches.size == 3) {
             toolsPanelShown = !toolsPanelShown;
         }
+
+        const now = window.performance.now() / 1000.0;;
+
+        if (activeTouches.size == 1 && (now - lastTouchTime) < 0.5) {
+            isDoubleTap = true;
+        } else {
+            isDoubleTap = false;
+        }
+
+        lastTouchTime = now;
 
         event.preventDefault();
     });
@@ -1472,8 +1539,13 @@ async function init()
             const newPosition = activeTouches.entries().next().value[1];
             const delta = [newPosition[0] - oldPosition[0], newPosition[1] - oldPosition[1]];
 
-            cameraCenter[0] -= delta[0] / canvas.width * cameraExtentX * 2.0;
-            cameraCenter[1] += delta[1] / canvas.height * cameraExtentY * 2.0;
+            if (isDoubleTap) {
+                actionPoint = newPosition;
+                actionDrag = delta;
+            } else {
+                cameraCenter[0] -= delta[0] / canvas.width * cameraExtentX * 2.0;
+                cameraCenter[1] += delta[1] / canvas.height * cameraExtentY * 2.0;
+            }
         }
 
         if (oldTouches.size == 2 && activeTouches.size == 2) {
@@ -1514,6 +1586,9 @@ async function init()
         for (const touch of event.changedTouches) {
             activeTouches.delete(touch.identifier);
         }
+        isDoubleTap = false;
+        actionPoint = null;
+        actionDrag = null;
         event.preventDefault();
     });
 
@@ -1521,6 +1596,9 @@ async function init()
         for (const touch of event.changedTouches) {
             activeTouches.delete(touch.identifier);
         }
+        isDoubleTap = false;
+        actionPoint = null;
+        actionDrag = null;
     });
 
     window.addEventListener('keydown',function(event) {
@@ -1586,7 +1664,7 @@ async function init()
     });
 
     simulationOptionsBuffer = device.createBuffer({
-        size: 40,
+        size: 64,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
@@ -2445,6 +2523,7 @@ async function copyUrl()
             
             <div class="rowBreak"></div>
             <div><center>[S] or three-tap to hide this menu</center></div>
+            <div><center>LMB or double-tap to interact</center></div>
         </div>
         <div id="debugPanel" class="panel">
             <div id="debugInfo">Debug info</div>
