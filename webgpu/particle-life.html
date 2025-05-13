@@ -1447,6 +1447,10 @@ async function init()
         });
     }
 
+    if (!document.body.requestFullscreen) {
+        document.getElementById("fullscreenButton").style.display = 'none';
+    }
+
     canvas = document.getElementById("mainCanvas");
 
     canvas.addEventListener('wheel', function(event) {
