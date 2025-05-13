@@ -2272,6 +2272,17 @@ async function copyUrl()
     await navigator.clipboard.writeText(url);
 }
 
+async function fullscreen()
+{
+    if (document.fullscreen) {
+        await document.exitFullscreen();
+        document.getElementById("fullscreenButton").innerText = "Fullscreen";
+    } else {
+        await document.body.requestFullscreen();
+        document.getElementById("fullscreenButton").innerText = "Exit fullscreen";
+    }
+}
+
         </script>
         <style>
             #mainCanvas {
@@ -2517,7 +2528,7 @@ async function copyUrl()
                 </tr>
                 <tr>
                     <td><div class="button" id="copyUrlButton" onclick="copyUrl();">Copy URL</div></td>
-                    <td></td>
+                    <td><div class="button" id="fullscreenButton" onclick="fullscreen();">Fullscreen</div></td>
                 </tr>
             </table>
             
