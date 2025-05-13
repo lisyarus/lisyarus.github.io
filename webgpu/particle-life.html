@@ -793,7 +793,7 @@ function redraw()
     const actionVX = actionDrag ? cameraExtentX * (2.0 * actionDrag[0] / canvas.width) : 0.0;
     const actionVY = actionDrag ? cameraExtentY * (- 2.0 * actionDrag[1] / canvas.height) : 0.0;
     const actionForce = actionPoint ? 20.0 : 0.0;
-    const actionRadius = 32.0;
+    const actionRadius = cameraExtentX / 16.0;
 
     actionDrag = [0.0, 0.0];
 
