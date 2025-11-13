@@ -15,6 +15,56 @@
                 margin: 0 !important;
                 padding: 0 !important;
             }
+
+            label {
+                font-family: monospace;
+                font-size: 14;
+                color: #eee;
+            }
+
+            a {
+                color: #bbb;
+                text-decoration: none;
+            }
+
+            a:hover {
+                color: #eee;
+                text-decoration: underline;
+            }
+
+            .panel {
+                background-color: rgba(50, 50, 50, 0.5);
+                border-radius: 8px;
+                border: 2px solid #eee;
+                color: #eee;
+                padding: 12px;
+                backdrop-filter: blur(4px);
+                font-family: monospace;
+                font-size: 14;
+            }
+
+            #mainCanvas {
+                position: fixed;
+            }
+
+            #copyright {
+                position: fixed;
+                left: 12px;
+                bottom: 12px;
+                color: #bbb;
+                font-family: monospace;
+                font-size: 14;
+            }
+
+            #debugPanel {
+                position: fixed;
+                left: 24px;
+                top: 24px;
+            }
+
+            #debugInfo {
+                white-space: pre;
+            }
         </style>
         <script type="module">
             import { init, resize } from './vox-logica.js';
@@ -24,5 +74,9 @@
     </head>
     <body>
         <canvas id="mainCanvas"></canvas>
+        <div id="debugPanel" class="panel">
+            <div id="debugInfo">Debug info</div>
+        </div>
+        <div id="copyright">by <a href="https://lisyarus.github.io/blog">@lisyarus</a></div>
     </body>
 </html>
