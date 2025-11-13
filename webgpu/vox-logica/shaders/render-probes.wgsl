@@ -51,14 +51,11 @@ fn getProbeIndex(voxel: vec3i, side: u32) -> u32
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
-    //const skyColor = vec3f(0.005, 0.01, 0.03);
-    const skyColor = vec3f(0.01, 0.02, 0.04);
-
     var ray = Ray(uniforms.cameraPosition, normalize(in.nearPlanePosition - uniforms.cameraPosition));
 
     let result = raytraceScene(ray, voxelsTexture);
     if (!result.intersected) {
-    	return vec4f(skyColor, 1.0);
+    	return vec4f(uniforms.skyColor, 1.0);
     }
 
     let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, result.voxel, 0).r]);
@@ -76,7 +73,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 			diffuseProbes[probeIndex].color = vec3f(0.0);
 			diffuseProbes[probeIndex].alpha = 0.0;
 			diffuseProbes[probeIndex].variance = 0.0;
-			diffuseProbes[probeIndex].iterations = 0u;
+			diffuseProbes[probeIndex].mu = 0.0;
 	    }
 
 	    if (diffuseProbes[probeIndex].alpha > 0.0) {

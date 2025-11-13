@@ -5,4 +5,5 @@ struct RenderUniforms
     lastFrameViewProjection: mat4x4f,
     cameraPosition: vec3f,
     frameID: u32,
+    skyColor: vec3f,
 }

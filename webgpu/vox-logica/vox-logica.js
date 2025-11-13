@@ -10,7 +10,7 @@ var surfaceFormat;
 // Constants
 
 const hdrFormat = 'rgba16float';
-const renderUniformsBufferSize = 208;
+const renderUniformsBufferSize = 224;
 
 const diffuseProbeSize = 48;
 const diffuseProbesPerVoxel = 6;
@@ -402,7 +402,7 @@ function initTestMap()
             testMap[i] = 1;
         }
 
-        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 32) {
+        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 127) {
             testMap[i] = 2;
         }
 
@@ -420,7 +420,11 @@ function initTestMap()
 
         const d = Math.max(Math.abs(dx), Math.abs(dy));
 
-        if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 8) {
+        if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 64) {
+            testMap[i] = 1;
+        }
+
+        if (d >= 63 && z == 31 + 64) {
             testMap[i] = 1;
         }
 
@@ -644,7 +648,7 @@ async function initShaderModules()
     renderProbesShaderModule = await loadShaderModule("render-probes.wgsl");
     diffuseProbesRecycleShaderModule = await loadShaderModule("diffuse-probes-recycle.wgsl");
     diffuseProbesIntegrateShaderModule = await loadShaderModule("diffuse-probes-integrate.wgsl");
-    // diffuseProbesSmoothShaderModule = await loadShaderModule("diffuse-probes-smooth.wgsl");
+    diffuseProbesSmoothShaderModule = await loadShaderModule("diffuse-probes-smooth.wgsl");
 	composeShaderModule = await loadShaderModule("compose.wgsl");
 }
 
@@ -751,18 +755,18 @@ function initPipelines()
         },
     });
 
-    // diffuseProbesSmoothPipeline = device.createComputePipeline({
-    //     layout: device.createPipelineLayout({
-    //         bindGroupLayouts: [
-    //             voxelsBindGroupLayout,
-    //             probesBindGroupLayout,
-    //         ],
-    //     }),
-    //     compute: {
-    //         module: diffuseProbesSmoothShaderModule,
-    //         entryPoint: 'smoothMain',
-    //     },
-    // });
+    diffuseProbesSmoothPipeline = device.createComputePipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [
+                voxelsBindGroupLayout,
+                probesBindGroupLayout,
+            ],
+        }),
+        compute: {
+            module: diffuseProbesSmoothShaderModule,
+            entryPoint: 'smoothMain',
+        },
+    });
 
     composePipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({
@@ -903,8 +907,13 @@ function redraw()
             renderUniformsFloat[i + 32] = lastFrameViewProjectionMatrix.values[i];
         for (var i = 0; i < 3; i += 1)
             renderUniformsFloat[i + 48] = camera.position[i];
-
         renderUniformsUint[51] = frameID;
+
+        const skyColor = [0.01, 0.02, 0.04, 1.0];
+        // const skyColor = [0.4, 0.7, 1.0, 1.0];
+        // const skyColor = [1.0, 1.0, 1.0, 1.0];
+        for (var i = 0; i < 4; i += 1)
+            renderUniformsFloat[i + 52] = skyColor[i];
     }
 
     device.queue.writeBuffer(renderUniformsBuffer, 0, renderUniforms);

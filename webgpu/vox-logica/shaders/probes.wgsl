@@ -16,7 +16,7 @@ struct DiffuseProbe
 	alpha: f32,
 
 	variance: f32,
-	iterations: u32,
+	mu: f32, // learning speed
 	padding1: u32,
 	padding2: u32,
 }

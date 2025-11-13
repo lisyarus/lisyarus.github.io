@@ -51,9 +51,6 @@ fn getProbeIndex(voxel: vec3i, side: u32) -> u32
 @compute @workgroup_size(64)
 fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 {
-    //const skyColor = vec3f(0.005, 0.01, 0.03);
-    const skyColor = vec3f(0.01, 0.02, 0.04);
-
 	if (id.x >= arrayLength(&diffuseProbes)) {
 		return;
 	}
@@ -97,7 +94,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 					diffuseProbes[probeIndex].color = vec3f(0.0);
 					diffuseProbes[probeIndex].alpha = 0.0;
 					diffuseProbes[probeIndex].variance = 0.0;
-					diffuseProbes[probeIndex].iterations = 0u;
+					diffuseProbes[probeIndex].mu = 0.0;
 			    }
 
 			    if (diffuseProbes[probeIndex].alpha > 0.0) {
@@ -112,14 +109,22 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 		    rayColor = voxelData.emission;
 	    }
     } else {
-    	rayColor = skyColor;
+    	rayColor = uniforms.skyColor;
     }
 
-    probe.iterations += 1u;
+    let probeLuminance = dot(probe.color, vec3f(0.2126, 0.7152, 0.0722));
+    let sampleLuminance = dot(rayColor, vec3f(0.2126, 0.7152, 0.0722));
 
-    let alpha = 1.0 / f32(probe.iterations);
-    probe.color = mix(probe.color, rayColor, alpha);
-    probe.alpha = mix(probe.alpha, 1.0, alpha);
+    let newMu = select(1.0, 1.0 - exp(- abs(sampleLuminance - probeLuminance) / sqrt(probe.variance) / 16.0), probe.variance > 0.0);
+    probe.mu = mix(probe.mu, newMu, 1.0 / 16.0);
+    probe.mu = 1.0 / 256.0;
+
+    let newLuminance = mix(probeLuminance, sampleLuminance, probe.mu);
+    probe.variance += ((sampleLuminance - probeLuminance) * (sampleLuminance - newLuminance) - probe.variance) * probe.mu;
+    probe.color = mix(probe.color, rayColor, probe.mu);
+    probe.alpha = mix(probe.alpha, 1.0, probe.mu);
+
+    //probe.mu *= 0.9;
 
     diffuseProbes[id.x] = probe;
 }
