@@ -6,6 +6,7 @@ var canvas;
 var device;
 var context;
 var surfaceFormat;
+var timestampQuerySupported;
 
 // Constants
 
@@ -24,7 +25,7 @@ const integrateProbesIterations = 1;
 var voxelTypesBuffer;
 
 var diffuseProbesCountBuffer;
-var diffuseProbesCountMappedBuffer;
+var diffuseProbesCountMapBuffer;
 var diffuseProbesBuffer;
 var diffuseProbesFreeBuffer;
 var diffuseProbesRecycleCountBuffer;
@@ -32,6 +33,13 @@ var diffuseProbesRecycleBuffer;
 var diffuseProbesRecycleWorkgroupCountBuffer;
 
 var renderUniformsBuffer;
+
+var performanceResolveBuffer;
+var performanceMapBuffer;
+
+// Query sets
+
+var performanceQuerySet;
 
 // Textures
 
@@ -87,7 +95,10 @@ var composePipeline;
 var frameID = 0;
 var framesInFlight = 0;
 
+var debugInfo = {};
+
 var waitingForDiffuseProbesCount = false;
+var waitingForPerformanceQuery = false;
 
 // Event state
 
@@ -265,11 +276,21 @@ async function initWebGPU()
         return;
     }
 
+    timestampQuerySupported = adapter.features.has('timestamp-query');
+    console.log("Timestamp query supported:", timestampQuerySupported);
+
+    var requiredFeatures = [];
+
+    if (timestampQuerySupported) {
+        requiredFeatures.push('timestamp-query');
+    }
+
     device = await adapter?.requestDevice({
         requiredLimits: {
             maxBufferSize: diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel,
             maxStorageBufferBindingSize: diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel,
         },
+        requiredFeatures: requiredFeatures,
     });
 
     if (!device) {
@@ -316,7 +337,7 @@ function initBuffers()
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
     });
 
-    diffuseProbesCountMappedBuffer = device.createBuffer({
+    diffuseProbesCountMapBuffer = device.createBuffer({
         label: "diffuseProbesCountMapped",
         size: 4,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
@@ -371,6 +392,31 @@ function initBuffers()
         size: renderUniformsBufferSize,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
+
+    if (timestampQuerySupported) {
+        performanceResolveBuffer = device.createBuffer({
+            label: "performanceResolve",
+            size: 48,
+            usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.QUERY_RESOLVE,
+        });
+
+        performanceMapBuffer = device.createBuffer({
+            label: "performanceMap",
+            size: 48,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+    }
+}
+
+function initQuerySets()
+{
+    if (timestampQuerySupported) {
+        performanceQuerySet = device.createQuerySet({
+            label: "performance",
+            count: 6,
+            type: "timestamp",
+        });
+    }
 }
 
 function initTestMap()
@@ -848,6 +894,7 @@ export async function init()
     initCanvas();
     await initWebGPU();
     initBuffers();
+    initQuerySets();
     await initTextures();
     initBindGroups();
     await initShaderModules();
@@ -857,6 +904,14 @@ export async function init()
     console.log("Initialized");
 
     redraw();
+}
+
+function formatExecutionTime(x) {
+    var result = (Number(x) / 1000000).toFixed(2);
+    while (result.length < 5) {
+        result = " " + result;
+    }
+    return result + " ms";
 }
 
 function redraw()
@@ -946,6 +1001,11 @@ function redraw()
                     storeOp: 'store',
                 },
             ],
+            ...(timestampQuerySupported) && { timestampWrites: {
+                querySet: performanceQuerySet,
+                beginningOfPassWriteIndex: 2,
+                endOfPassWriteIndex: 3,
+            }},
         });
         mainPass.setBindGroup(0, voxelsBindGroup);
         mainPass.setBindGroup(1, renderUniformsBindGroup);
@@ -956,7 +1016,13 @@ function redraw()
 
     if (renderMode == 'probes') {
         for (var i = 0; i < integrateProbesIterations; i += 1) {
-            const integrateProbesPass = encoder.beginComputePass({});
+            const integrateProbesPass = encoder.beginComputePass({
+                ...(timestampQuerySupported) && { timestampWrites: {
+                    querySet: performanceQuerySet,
+                    beginningOfPassWriteIndex: 0,
+                    endOfPassWriteIndex: 1,
+                }},
+            });
             integrateProbesPass.setBindGroup(0, voxelsBindGroup);
             integrateProbesPass.setBindGroup(1, probesBindGroup);
             integrateProbesPass.setBindGroup(2, renderUniformsBindGroup);
@@ -977,6 +1043,11 @@ function redraw()
                     storeOp: 'store',
                 },
             ],
+            ...(timestampQuerySupported) && { timestampWrites: {
+                querySet: performanceQuerySet,
+                beginningOfPassWriteIndex: 2,
+                endOfPassWriteIndex: 3,
+            }},
         });
         mainPass.setBindGroup(0, voxelsBindGroup);
         mainPass.setBindGroup(1, probesBindGroup);
@@ -1004,6 +1075,11 @@ function redraw()
                 storeOp: 'store',
             },
         ],
+        ...(timestampQuerySupported) && { timestampWrites: {
+            querySet: performanceQuerySet,
+            beginningOfPassWriteIndex: 4,
+            endOfPassWriteIndex: 5,
+        }},
     });
     composeRenderPass.setBindGroup(0, composeBindGroup);
     composeRenderPass.setPipeline(composePipeline);
@@ -1011,33 +1087,62 @@ function redraw()
     composeRenderPass.end();
 
     var needMapDiffuseProbesCount = false;
+    var needMapPerformanceQuery = false;
 
     if (!waitingForDiffuseProbesCount) {
         waitingForDiffuseProbesCount = true;
-        encoder.copyBufferToBuffer(diffuseProbesCountBuffer, diffuseProbesCountMappedBuffer);
+        encoder.copyBufferToBuffer(diffuseProbesCountBuffer, diffuseProbesCountMapBuffer);
         needMapDiffuseProbesCount = true;
+    }
+
+    if (!waitingForPerformanceQuery && timestampQuerySupported) {
+        waitingForPerformanceQuery = true;
+        encoder.resolveQuerySet(performanceQuerySet, 0, 6, performanceResolveBuffer, 0);
+        encoder.copyBufferToBuffer(performanceResolveBuffer, performanceMapBuffer);
+        needMapPerformanceQuery = true;
     }
  
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 
     if (needMapDiffuseProbesCount) {
-        diffuseProbesCountMappedBuffer.mapAsync(GPUMapMode.READ).then(
+        diffuseProbesCountMapBuffer.mapAsync(GPUMapMode.READ).then(
             () => {
-                let count = new Uint32Array(diffuseProbesCountMappedBuffer.getMappedRange());
-
-                var debugText = "Diffuse probes: " + count[0];
-                document.getElementById("debugInfo").innerText = debugText;
-                diffuseProbesCountMappedBuffer.unmap();
+                let count = new Uint32Array(diffuseProbesCountMapBuffer.getMappedRange());
+                debugInfo.diffuseProbes = count[0];
+                diffuseProbesCountMapBuffer.unmap();
                 waitingForDiffuseProbesCount = false;
             },
             (error) => {
-                var debugText = "Diffuse probes: " + error;
-                document.getElementById("debugInfo").innerText = debugText;
+                debugInfo.diffuseProbes = error;
                 waitingForDiffuseProbesCount = false;
             }
         );
     }
+
+    if (needMapPerformanceQuery) {
+        performanceMapBuffer.mapAsync(GPUMapMode.READ).then(
+            () => {
+                let count = new BigUint64Array(performanceMapBuffer.getMappedRange());
+                debugInfo.integrateTime = formatExecutionTime(count[1] - count[0]);
+                debugInfo.renderTime = formatExecutionTime(count[3] - count[2]);
+                debugInfo.composeTime = formatExecutionTime(count[5] - count[4]);
+                performanceMapBuffer.unmap();
+                waitingForPerformanceQuery = false;
+            },
+            (error) => {
+                debugInfo.frameTime = error;
+                waitingForPerformanceQuery = false;
+            }
+        );
+    }
+
+    var debugText = "";
+    debugText += "Diffuse probes: " + debugInfo.diffuseProbes + "\n";
+    debugText += "Integrate: " + debugInfo.integrateTime + "\n";
+    debugText += "Render:    " + debugInfo.renderTime + "\n";
+    debugText += "Compose:   " + debugInfo.composeTime + "\n";
+    document.getElementById("debugInfo").innerText = debugText;
 
     ++framesInFlight;
     device.queue.onSubmittedWorkDone().then(() => { --framesInFlight; });
