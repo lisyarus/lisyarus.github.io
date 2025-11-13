@@ -104,7 +104,6 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
     var position = ray.origin + ray.direction * intersection.min;
     var cell = max(vec3i(0), min(vec3i(floor(position)), mapSize - vec3i(1)));
     var voxelType = 0u;
-    var steps = 1u;
 
     while (true)
     {
@@ -112,7 +111,6 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
         if (voxelType != 0u) {
             break;
         }
-        steps += 1u;
 
         let t = (select(vec3f(0.0), vec3f(1.0), ray.direction > vec3f(0.0)) + vec3f(cell) - position) / ray.direction;
 
@@ -127,7 +125,7 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
             cell.z += select(-1, 1, ray.direction.z > 0.0);
         }
 
-        if (any(cell < vec3i(0)) || any(cell >= vec3i(mapSize)) || (ray.direction.z > 0.0 && cell.z > 136)) {
+        if (any(cell < vec3i(0)) || any(cell >= vec3i(mapSize))) {
             return NO_INTERSECTION;
         }
     }

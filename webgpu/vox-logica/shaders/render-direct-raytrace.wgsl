@@ -13,10 +13,10 @@
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
-    var randomGenerator = RandomGenerator(0x2f21b60du);
-    randomInit(&randomGenerator, u32(in.position.x));
+    var randomGenerator = RandomGenerator(u32(in.position.x));
     randomInit(&randomGenerator, u32(in.position.y));
     randomInit(&randomGenerator, uniforms.frameID);
+    randomInit(&randomGenerator, 0x2f21b60du);
 
     const skyColor = vec3f(0.005, 0.01, 0.03);
 
@@ -38,7 +38,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 
         let normal = SIDE_NORMALS[result.side];
 
-        let newDirection = normalize(normal + randomSphere(&randomGenerator));
+        let newDirection = randomCosineHemisphere(&randomGenerator, normal);
         ray = Ray(result.point + newDirection * 0.01, newDirection);
     }
 

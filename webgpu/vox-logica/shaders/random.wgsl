@@ -37,3 +37,8 @@ fn randomSphere(gen: ptr<function, RandomGenerator>) -> vec3f
 
     return vec3f(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
 }
+
+fn randomCosineHemisphere(gen: ptr<function, RandomGenerator>, n : vec3f) -> vec3f
+{
+    return normalize(n + randomSphere(gen));
+}
