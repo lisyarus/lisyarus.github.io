@@ -51,7 +51,8 @@ fn getProbeIndex(voxel: vec3i, side: u32) -> u32
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
-    const skyColor = vec3f(0.005, 0.01, 0.03);
+    //const skyColor = vec3f(0.005, 0.01, 0.03);
+    const skyColor = vec3f(0.01, 0.02, 0.04);
 
     var ray = Ray(uniforms.cameraPosition, normalize(in.nearPlanePosition - uniforms.cameraPosition));
 

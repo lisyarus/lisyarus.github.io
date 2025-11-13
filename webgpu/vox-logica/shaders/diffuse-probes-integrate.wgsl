@@ -51,6 +51,9 @@ fn getProbeIndex(voxel: vec3i, side: u32) -> u32
 @compute @workgroup_size(64)
 fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 {
+    //const skyColor = vec3f(0.005, 0.01, 0.03);
+    const skyColor = vec3f(0.01, 0.02, 0.04);
+
 	if (id.x >= arrayLength(&diffuseProbes)) {
 		return;
 	}
@@ -71,13 +74,14 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     let normal = SIDE_NORMALS[side];
     let direction = randomCosineHemisphere(&randomGenerator, normal);
     var origin = vec3f(probe.voxel) + vec3f(0.5) + normal * 0.5;
-    var randomOffset = vec3f(random(&randomGenerator), random(&randomGenerator), random(&randomGenerator)) - vec3f(0.5);
-    randomOffset -= normal * dot(randomOffset, normal);
-    let ray = Ray(origin + 0.0*randomOffset + direction * 0.01, direction);
+    {
+	    var randomOffset = vec3f(random(&randomGenerator), random(&randomGenerator), random(&randomGenerator)) - vec3f(0.5);
+	    randomOffset -= normal * dot(randomOffset, normal);
+	    origin += randomOffset*0.98;
+	}
+    let ray = Ray(origin + normal * 0.01, direction);
 
     var rayColor = vec3f(0.0);
-
-    const skyColor = vec3f(0.005, 0.01, 0.03);
 
     let raytraceResult = raytraceScene(ray, voxelsTexture);
     if (raytraceResult.intersected) {
@@ -116,7 +120,6 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     let alpha = 1.0 / f32(probe.iterations);
     probe.color = mix(probe.color, rayColor, alpha);
     probe.alpha = mix(probe.alpha, 1.0, alpha);
-    probe.alpha = 1.0;
 
     diffuseProbes[id.x] = probe;
 }
