@@ -16,7 +16,13 @@ struct Interval
     max: f32,
 }
 
-fn rayAABBIntersection(ray : Ray, aabb : AABB) -> Interval
+struct RayAABBIntersectionResult
+{
+    range: Interval,
+    side: u32,
+}
+
+fn rayAABBIntersection(ray : Ray, aabb : AABB) -> RayAABBIntersectionResult
 {
     var tmin = (aabb.min - ray.origin) / ray.direction;
     var tmax = (aabb.max - ray.origin) / ray.direction;
@@ -39,10 +45,21 @@ fn rayAABBIntersection(ray : Ray, aabb : AABB) -> Interval
         tmax.z = temp;
     }
 
-    return Interval(
+    let range = Interval(
         max(tmin.x, max(tmin.y, tmin.z)),
         min(tmax.x, min(tmax.y, tmax.z)),
     );
+
+    var side = 0u;
+    if (range.min == tmin.x) {
+        side = select(0u, 1u, ray.direction.x < 0.0);
+    } else if (range.min == tmin.y) {
+        side = select(2u, 3u, ray.direction.y < 0.0);
+    } else {
+        side = select(4u, 5u, ray.direction.z < 0.0);
+    }
+
+    return RayAABBIntersectionResult(range, side);
 }
 
 fn computeSide(n : vec3f) -> u32
@@ -104,15 +121,16 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
 
     var intersection = rayAABBIntersection(ray, bbox);
 
-    if (intersection.min > intersection.max || intersection.max < 0.0) {
+    if (intersection.range.min > intersection.range.max || intersection.range.max < 0.0) {
         return NO_INTERSECTION;
     }
 
-    intersection.min = max(intersection.min, 0.0);
+    intersection.range.min = max(intersection.range.min, 0.0);
 
-    var position = ray.origin + ray.direction * intersection.min;
+    var position = ray.origin + ray.direction * intersection.range.min;
     var cell = max(vec3i(0), min(vec3i(floor(position)), mapSize - vec3i(1)));
     var voxelType = 0u;
+    var side = intersection.side;
 
     while (true)
     {
@@ -126,20 +144,21 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
         if (t.x < t.y && t.x < t.z) {
             position += ray.direction * t.x;
             cell.x += select(-1, 1, ray.direction.x > 0.0);
+            side = select(0u, 1u, ray.direction.x < 0.0);
         } else if (t.y < t.z) {
             position += ray.direction * t.y;
             cell.y += select(-1, 1, ray.direction.y > 0.0);
+            side = select(2u, 3u, ray.direction.y < 0.0);
         } else {
             position += ray.direction * t.z;
             cell.z += select(-1, 1, ray.direction.z > 0.0);
+            side = select(4u, 5u, ray.direction.z < 0.0);
         }
 
         if (any(cell < vec3i(0)) || any(cell >= vec3i(mapSize))) {
             return NO_INTERSECTION;
         }
     }
-
-    let side = computeSide(position - (vec3f(cell) + vec3f(0.5)));
 
     return RaytraceResult(true, cell, position, side);
 }
