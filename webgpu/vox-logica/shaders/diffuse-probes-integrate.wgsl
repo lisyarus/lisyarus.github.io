@@ -29,7 +29,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
 	var probe = diffuseProbes[id.x];
 
-	if (probe.state == EMPTY_PROBE) {
+	if (probe.state != USED_PROBE) {
 		return;
 	}
 
