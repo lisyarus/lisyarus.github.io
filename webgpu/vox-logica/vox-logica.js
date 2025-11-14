@@ -133,18 +133,8 @@ function cameraProjectionMatrix(camera)
 
 // Data loading functions
 
-var shaderCodeCache = new Map();
-
 async function loadShaderCode(path, included)
 {
-    included.add(path);
-
-    if (shaderCodeCache.has(path)) {
-        return shaderCodeCache.get(path);
-    }
-
-    console.log("Loading", path);
-
     const response = await fetch("shaders/" + path);
     if (!response.ok) {
         throw new Error("Failed to load shader " + path);
@@ -166,12 +156,11 @@ async function loadShaderCode(path, included)
         if (included.has(includePath)) {
             shaderCode = shaderCode.substring(0, index) + shaderCode.substring(end);
         } else {
+            included.add(includePath);
             const includedCode = await loadShaderCode(includePath, included);
             shaderCode = shaderCode.substring(0, index) + includedCode + shaderCode.substring(end);
         }
     }
-
-    shaderCodeCache.set(path, shaderCode);
 
     return shaderCode;
 }
