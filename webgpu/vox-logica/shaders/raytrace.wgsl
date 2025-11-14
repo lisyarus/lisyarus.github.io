@@ -78,6 +78,15 @@ struct RaytraceResult
 
 const NO_INTERSECTION = RaytraceResult(false, vec3i(0), vec3f(0.0), 0u);
 
+const SIDE_NEIGHBOURS = array<vec3i, 6>(
+    vec3i(-1,  0,  0),
+    vec3i( 1,  0,  0),
+    vec3i( 0, -1,  0),
+    vec3i( 0,  1,  0),
+    vec3i( 0,  0, -1),
+    vec3i( 0,  0,  1),
+);
+
 const SIDE_NORMALS = array<vec3f, 6>(
     vec3f(-1.0,  0.0,  0.0),
     vec3f( 1.0,  0.0,  0.0),

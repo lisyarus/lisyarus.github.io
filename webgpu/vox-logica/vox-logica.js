@@ -13,8 +13,7 @@ var timestampQuerySupported;
 const hdrFormat = 'rgba16float';
 const renderUniformsBufferSize = 224;
 
-const diffuseProbeSize = 48;
-const diffuseProbesPerVoxel = 6;
+const diffuseProbeSize = 64;
 const diffuseProbesTableSize = 1048576;
 
 const renderMode = 'probes';
@@ -77,7 +76,6 @@ var renderDirectRaytraceShaderModule;
 var renderProbesShaderModule;
 var diffuseProbesRecycleShaderModule;
 var diffuseProbesIntegrateShaderModule;
-var diffuseProbesSmoothShaderModule;
 var composeShaderModule;
 
 // Pipelines
@@ -87,7 +85,6 @@ var renderProbesPipeline;
 var diffuseProbesRecyclePreparePipeline;
 var diffuseProbesRecyclePipeline;
 var diffuseProbesIntegratePipeline;
-var diffuseProbesSmoothPipeline;
 var composePipeline;
 
 // Frame management
@@ -287,8 +284,8 @@ async function initWebGPU()
 
     device = await adapter?.requestDevice({
         requiredLimits: {
-            maxBufferSize: diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel,
-            maxStorageBufferBindingSize: diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel,
+            // maxBufferSize: diffuseProbeSize * diffuseProbesTableSize,
+            // maxStorageBufferBindingSize: diffuseProbeSize * diffuseProbesTableSize,
         },
         requiredFeatures: requiredFeatures,
     });
@@ -345,7 +342,7 @@ function initBuffers()
 
     diffuseProbesBuffer = device.createBuffer({
         label: "diffuseProbes",
-        size: diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel,
+        size: diffuseProbeSize * diffuseProbesTableSize,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
 
@@ -377,8 +374,8 @@ function initBuffers()
     diffuseProbesCountInit.fill(0);
     device.queue.writeBuffer(diffuseProbesCountBuffer, 0, diffuseProbesCountInit);
 
-    const diffuseProbesInit = new Uint32Array(diffuseProbeSize * diffuseProbesTableSize * diffuseProbesPerVoxel / 4);
-    diffuseProbesInit.fill(0xffffffff);
+    const diffuseProbesInit = new Uint32Array(diffuseProbeSize * diffuseProbesTableSize / 4);
+    diffuseProbesInit.fill(0);
     device.queue.writeBuffer(diffuseProbesBuffer, 0, diffuseProbesInit);
 
     const diffuseProbesFreeInit = new Uint32Array(diffuseProbesTableSize);
@@ -439,7 +436,7 @@ function initTestMap()
 
     const testMap = new Uint8Array(256 * 256 * 256);
 
-    testMap.fill(2);
+    testMap.fill(0);
 
     for (var i = 0; i < testMap.length; i += 1) {
         const x = ((i >>  0) & 255);
@@ -448,21 +445,15 @@ function initTestMap()
 
         const dx = x - 128;
         const dy = y - 128;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
 
         testMap[i] = 0;
-        // const l = Math.sqrt((x - 128) * (x - 128) + (y - 128) * (y - 128));
-        // if (z <= 120 + (8 + 8 * Math.cos(l * 0.25)) / (1 + l * 0.01)) {
-        //     testMap[i] = 1;
-        //     if (z == 120) {
-        //         testMap[i] = 2;
-        //     }
-        // }
 
-        if (z <= 31) {
+        if (z == 0) {
             testMap[i] = 1;
         }
 
-        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 127) {
+        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
             testMap[i] = 2;
         }
 
@@ -478,7 +469,6 @@ function initTestMap()
             testMap[i] = 1;
         }
 
-        const d = Math.max(Math.abs(dx), Math.abs(dy));
 
         if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 64) {
             testMap[i] = 1;
@@ -708,7 +698,6 @@ async function initShaderModules()
     renderProbesShaderModule = await loadShaderModule("render-probes.wgsl");
     diffuseProbesRecycleShaderModule = await loadShaderModule("diffuse-probes-recycle.wgsl");
     diffuseProbesIntegrateShaderModule = await loadShaderModule("diffuse-probes-integrate.wgsl");
-    diffuseProbesSmoothShaderModule = await loadShaderModule("diffuse-probes-smooth.wgsl");
 	composeShaderModule = await loadShaderModule("compose.wgsl");
 }
 
@@ -812,19 +801,6 @@ function initPipelines()
         compute: {
             module: diffuseProbesIntegrateShaderModule,
             entryPoint: 'integrateMain',
-        },
-    });
-
-    diffuseProbesSmoothPipeline = device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [
-                voxelsBindGroupLayout,
-                probesBindGroupLayout,
-            ],
-        }),
-        compute: {
-            module: diffuseProbesSmoothShaderModule,
-            entryPoint: 'smoothMain',
         },
     });
 
@@ -978,8 +954,9 @@ function redraw()
             renderUniformsFloat[i + 48] = camera.position[i];
         renderUniformsUint[51] = frameID;
 
-        const skyColor = [0.01, 0.02, 0.04, 1.0];
-        // const skyColor = [0.4, 0.7, 1.0, 1.0];
+        // const skyColor = [0.01, 0.02, 0.04, 1.0];
+        // const skyColor = [0.1, 0.2, 0.3, 1.0];
+        const skyColor = [0.4, 0.7, 1.0, 1.0];
         // const skyColor = [1.0, 1.0, 1.0, 1.0];
         for (var i = 0; i < 4; i += 1)
             renderUniformsFloat[i + 52] = skyColor[i];
@@ -1027,10 +1004,7 @@ function redraw()
             integrateProbesPass.setBindGroup(1, probesBindGroup);
             integrateProbesPass.setBindGroup(2, renderUniformsBindGroup);
             integrateProbesPass.setPipeline(diffuseProbesIntegratePipeline);
-            // integrateProbesPass.dispatchWorkgroups((diffuseProbesTableSize * 6) / 64);
-            integrateProbesPass.dispatchWorkgroups(65535);
-            // integrateProbesPass.setPipeline(diffuseProbesSmoothPipeline);
-            // integrateProbesPass.dispatchWorkgroups(65535);
+            integrateProbesPass.dispatchWorkgroups(diffuseProbesTableSize / 64);
             integrateProbesPass.end();
         }
 

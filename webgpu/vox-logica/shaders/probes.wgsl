@@ -5,18 +5,17 @@ struct ProbeID
 }
 
 const NULL_INDEX = 0xffffffffu;
-const EMPTY_PROBE = 0xffffffffu;
+const EMPTY_PROBE = 0u;
+const PENDING_PROBE = 1u;
+const USED_PROBE = 2u;
 
 struct DiffuseProbe
 {
 	voxel: vec3i,
-	relevanceAndSide: u32, // low 16 bits - relevance, high 16 bits - side
+	state: u32, 
 
-	color: vec3f,
-	alpha: f32,
-
-	variance: f32,
-	mu: f32, // learning speed
-	padding1: u32,
-	padding2: u32,
+	// Per-channel SH coefficients
+	colorR: vec4f,
+	colorG: vec4f,
+	colorB: vec4f,
 }

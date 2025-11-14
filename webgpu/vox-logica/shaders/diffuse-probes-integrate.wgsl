@@ -18,6 +18,7 @@
 %include raytrace.wgsl
 %include voxel-data.wgsl
 %include probe-allocate.wgsl
+%include spherical-harmonics.wgsl
 
 @compute @workgroup_size(64)
 fn integrateMain(@builtin(global_invocation_id) id: vec3u)
@@ -28,7 +29,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
 	var probe = diffuseProbes[id.x];
 
-	if (probe.relevanceAndSide == EMPTY_PROBE) {
+	if (probe.state == EMPTY_PROBE) {
 		return;
 	}
 
@@ -38,16 +39,13 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     randomInit(&randomGenerator, uniforms.frameID);
     randomInit(&randomGenerator, 0x2f21b60du);
 
-    let side = probe.relevanceAndSide >> 16;
-    let normal = SIDE_NORMALS[side];
-    let direction = randomCosineHemisphere(&randomGenerator, normal);
-    var origin = vec3f(probe.voxel) + vec3f(0.5) + normal * 0.5;
+    let direction = randomSphere(&randomGenerator);
+    var origin = vec3f(probe.voxel) + vec3f(0.5);
     {
 	    var randomOffset = vec3f(random(&randomGenerator), random(&randomGenerator), random(&randomGenerator)) - vec3f(0.5);
-	    randomOffset -= normal * dot(randomOffset, normal);
 	    origin += randomOffset*0.98;
 	}
-    let ray = Ray(origin + normal * 0.01, direction);
+    let ray = Ray(origin, direction);
 
     var rayColor = vec3f(0.0);
 
@@ -56,24 +54,16 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     	let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, raytraceResult.voxel, 0).r]);
 
 	    if (voxelData.mode == VOXEL_DIFFUSE) {
-		    let probeIndex = getProbeIndex(raytraceResult.voxel, raytraceResult.side);
+	    	let probeVoxel = raytraceResult.voxel + SIDE_NEIGHBOURS[raytraceResult.side];
+		    let probeIndex = getProbeIndex(probeVoxel);
 
 		    if (probeIndex != NULL_INDEX) {
-			    if (diffuseProbes[probeIndex].relevanceAndSide == EMPTY_PROBE) {
-					diffuseProbes[probeIndex].voxel = raytraceResult.voxel;
-					diffuseProbes[probeIndex].relevanceAndSide = (raytraceResult.side << 16);
-					diffuseProbes[probeIndex].color = vec3f(0.0);
-					diffuseProbes[probeIndex].alpha = 0.0;
-					diffuseProbes[probeIndex].variance = 0.0;
-					diffuseProbes[probeIndex].mu = 0.0;
-			    }
+		    	let diffuseSH = diffuseFromSH1(SIDE_NORMALS[raytraceResult.side]);
+		    	rayColor.r = dot(diffuseSH, diffuseProbes[probeIndex].colorR);
+		    	rayColor.g = dot(diffuseSH, diffuseProbes[probeIndex].colorG);
+		    	rayColor.b = dot(diffuseSH, diffuseProbes[probeIndex].colorB);
 
-			    if (diffuseProbes[probeIndex].alpha > 0.0) {
-			    	rayColor = diffuseProbes[probeIndex].color * voxelData.albedo / diffuseProbes[probeIndex].alpha;
-			    	if (any(min(rayColor, vec3f(10000.0)) == vec3f(10000.0))) {
-			    		rayColor = vec3f(0.0);
-			    	}
-			    }
+		    	rayColor *= voxelData.albedo / PI;
 	    	}
 	    }
 	    else if (voxelData.mode == VOXEL_EMISSIVE) {
@@ -83,19 +73,15 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     	rayColor = uniforms.skyColor;
     }
 
-    let probeLuminance = dot(probe.color, vec3f(0.2126, 0.7152, 0.0722));
-    let sampleLuminance = dot(rayColor, vec3f(0.2126, 0.7152, 0.0722));
+    // Inverse direction probability for Monte-Carlo
+    rayColor *= 4.0 * PI;
 
-    let newMu = select(1.0, 1.0 - exp(- abs(sampleLuminance - probeLuminance) / sqrt(probe.variance) / 16.0), probe.variance > 0.0);
-    probe.mu = mix(probe.mu, newMu, 1.0 / 16.0);
-    probe.mu = 1.0 / 256.0;
+    let mu = 1.0 / 256.0;
 
-    let newLuminance = mix(probeLuminance, sampleLuminance, probe.mu);
-    probe.variance += ((sampleLuminance - probeLuminance) * (sampleLuminance - newLuminance) - probe.variance) * probe.mu;
-    probe.color = mix(probe.color, rayColor, probe.mu);
-    probe.alpha = mix(probe.alpha, 1.0, probe.mu);
-
-    //probe.mu *= 0.9;
+    let directionSH = evalSH1(direction);
+    probe.colorR = mix(probe.colorR, rayColor.r * directionSH, mu);
+    probe.colorG = mix(probe.colorG, rayColor.g * directionSH, mu);
+    probe.colorB = mix(probe.colorB, rayColor.b * directionSH, mu);
 
     diffuseProbes[id.x] = probe;
 }

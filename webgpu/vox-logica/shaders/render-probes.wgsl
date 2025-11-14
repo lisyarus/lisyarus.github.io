@@ -18,41 +18,35 @@
 %include raytrace.wgsl
 %include voxel-data.wgsl
 %include probe-allocate.wgsl
+%include spherical-harmonics.wgsl
 
 @fragment
 fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
     var ray = Ray(uniforms.cameraPosition, normalize(in.nearPlanePosition - uniforms.cameraPosition));
 
-    let result = raytraceScene(ray, voxelsTexture);
-    if (!result.intersected) {
+    let raytraceResult = raytraceScene(ray, voxelsTexture);
+    if (!raytraceResult.intersected) {
     	return vec4f(uniforms.skyColor, 1.0);
     }
 
-    let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, result.voxel, 0).r]);
+    let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, raytraceResult.voxel, 0).r]);
 
     if (voxelData.mode == VOXEL_DIFFUSE) {
-	    let probeIndex = getProbeIndex(result.voxel, result.side);
+    	let probeVoxel = raytraceResult.voxel + SIDE_NEIGHBOURS[raytraceResult.side];
+	    let probeIndex = getProbeIndex(probeVoxel);
 
 	    if (probeIndex == NULL_INDEX) {
 	    	return vec4f(0.0, 0.0, 0.0, 1.0);
 	    }
 
-	    if (diffuseProbes[probeIndex].relevanceAndSide == EMPTY_PROBE) {
-			diffuseProbes[probeIndex].voxel = result.voxel;
-			diffuseProbes[probeIndex].relevanceAndSide = (result.side << 16);
-			diffuseProbes[probeIndex].color = vec3f(0.0);
-			diffuseProbes[probeIndex].alpha = 0.0;
-			diffuseProbes[probeIndex].variance = 0.0;
-			diffuseProbes[probeIndex].mu = 0.0;
-	    }
+    	let diffuseSH = diffuseFromSH1(SIDE_NORMALS[raytraceResult.side]);
+    	var color = vec3f(0.0);
+    	color.r = dot(diffuseSH, diffuseProbes[probeIndex].colorR);
+    	color.g = dot(diffuseSH, diffuseProbes[probeIndex].colorG);
+    	color.b = dot(diffuseSH, diffuseProbes[probeIndex].colorB);
 
-	    if (diffuseProbes[probeIndex].alpha > 0.0) {
-		    let color = diffuseProbes[probeIndex].color * voxelData.albedo / diffuseProbes[probeIndex].alpha;
-		    return vec4f(color, 1.0);
-	    } else {
-	    	return vec4f(0.0, 0.0, 0.0, 1.0);
-	    }
+	    return vec4f(color * voxelData.albedo / PI, 1.0);
     }
     else if (voxelData.mode == VOXEL_EMISSIVE) {
 	    return vec4f(voxelData.emission, 1.0);
