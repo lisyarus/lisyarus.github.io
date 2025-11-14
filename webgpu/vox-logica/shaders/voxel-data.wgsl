@@ -16,6 +16,6 @@ fn unpackVoxelData(data: u32) -> VoxelData
     if (mode == VOXEL_DIFFUSE) {
         return VoxelData(mode, baseColor, vec3f(0.0));
     } else {
-        return VoxelData(mode, vec3f(0.0), 8.0 * baseColor);
+        return VoxelData(mode, vec3f(0.0), 32.0 * baseColor);
     }
 }
