@@ -6,6 +6,10 @@ fn getProbeIndex(voxel: vec3i) -> u32
 		return NULL_INDEX;
 	}
 
+	if (textureLoad(voxelsTexture, voxel, 0).r != 0u) {
+		return NULL_INDEX;
+	}
+
     let voxelIndex = voxel.x + 256 * (voxel.y + 256 * voxel.z);
     var probeIndex = atomicLoad(&voxelProbeIndex[voxelIndex]);
 
