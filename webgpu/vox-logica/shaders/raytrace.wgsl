@@ -91,9 +91,10 @@ struct RaytraceResult
     voxel: vec3i,
     point: vec3f,
     side: u32, // -X, +X, -Y, +Y, -Z, +Z
+    emissiveSamplingProbability: f32,
 }
 
-const NO_INTERSECTION = RaytraceResult(false, vec3i(0), vec3f(0.0), 0u);
+const NO_INTERSECTION = RaytraceResult(false, vec3i(0), vec3f(0.0), 0u, 0.0);
 
 const SIDE_NEIGHBOURS = array<vec3i, 6>(
     vec3i(-1,  0,  0),
@@ -113,7 +114,7 @@ const SIDE_NORMALS = array<vec3f, 6>(
     vec3f( 0.0,  0.0,  1.0),
 );
 
-fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
+fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>, computeEmissiveSamplingProbability: bool) -> RaytraceResult
 {
     let mapSize = vec3i(textureDimensions(voxelsTexture));
 
@@ -129,15 +130,41 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
 
     var position = ray.origin + ray.direction * intersection.range.min;
     var cell = max(vec3i(0), min(vec3i(floor(position)), mapSize - vec3i(1)));
-    var voxelType = 0u;
     var side = intersection.side;
+    var lastVoxelType = 0u;
+    var emissiveSamplingProbability = 0.0;
+
+    var result = NO_INTERSECTION;
 
     while (true)
     {
-        voxelType = textureLoad(voxelsTexture, cell, 0).r;
-        if (voxelType != 0u) {
-            break;
+        let voxelType = textureLoad(voxelsTexture, cell, 0).r;
+        if (voxelType != 0u && !result.intersected) {
+            result = RaytraceResult(true, cell, position, side, 0.0);
+            if (!computeEmissiveSamplingProbability) {
+                break;
+            }
         }
+
+        if (computeEmissiveSamplingProbability) {
+            if (voxelType != 0u && lastVoxelType == 0u) {
+                let voxelData = unpackVoxelData(voxelTypes[voxelType]);
+                if (voxelData.mode == VOXEL_EMISSIVE) {
+                    let delta = position - ray.origin;
+                    emissiveSamplingProbability += dot(delta, delta) / max(1e-8, abs(dot(ray.direction, SIDE_NORMALS[side])));
+                }
+            }
+
+            if (voxelType == 0u && lastVoxelType != 0u) {
+                let voxelData = unpackVoxelData(voxelTypes[lastVoxelType]);
+                if (voxelData.mode == VOXEL_EMISSIVE) {
+                    let delta = position - ray.origin;
+                    emissiveSamplingProbability += dot(delta, delta) / max(1e-8, abs(dot(ray.direction, SIDE_NORMALS[side])));
+                }
+            }
+        }
+
+        lastVoxelType = voxelType;
 
         let t = (select(vec3f(0.0), vec3f(1.0), ray.direction > vec3f(0.0)) + vec3f(cell) - position) / ray.direction;
 
@@ -156,9 +183,10 @@ fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>) -> RaytraceResult
         }
 
         if (any(cell < vec3i(0)) || any(cell >= vec3i(mapSize))) {
-            return NO_INTERSECTION;
+            break;
         }
     }
 
-    return RaytraceResult(true, cell, position, side);
+    result.emissiveSamplingProbability = emissiveSamplingProbability;
+    return result;
 }

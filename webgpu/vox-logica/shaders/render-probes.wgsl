@@ -23,7 +23,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 {
     var ray = Ray(uniforms.cameraPosition, normalize(in.nearPlanePosition - uniforms.cameraPosition));
 
-    let raytraceResult = raytraceScene(ray, voxelsTexture);
+    let raytraceResult = raytraceScene(ray, voxelsTexture, false);
     if (!raytraceResult.intersected) {
     	return vec4f(uniforms.skyColor, 1.0);
     }

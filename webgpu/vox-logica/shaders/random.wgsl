@@ -27,6 +27,11 @@ fn random(gen: ptr<function, RandomGenerator>) -> f32
     return f32(randomUint(gen)) / 4294967295.0;
 }
 
+fn randomCube(gen: ptr<function, RandomGenerator>) -> vec3f
+{
+    return vec3f(random(gen), random(gen), random(gen));
+}
+
 fn randomSphere(gen: ptr<function, RandomGenerator>) -> vec3f
 {
     const PI = 3.141592653589793;

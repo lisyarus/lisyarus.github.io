@@ -1,6 +1,13 @@
+struct EmissiveFace
+{
+	voxel: vec3i,
+	side: u32,
+}
+
 @group(0) @binding(0) var<storage, read> voxelTypes : array<u32, 256>;
 @group(0) @binding(1) var voxelsTexture : texture_3d<u32>;
 @group(0) @binding(2) var<storage, read_write> voxelProbeIndex : array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> emissiveFaces: array<EmissiveFace>;
 
 %include probes.wgsl
 
@@ -37,17 +44,35 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     randomInit(&randomGenerator, uniforms.frameID);
     randomInit(&randomGenerator, 0x2f21b60du);
 
-    let direction = randomSphere(&randomGenerator);
     var origin = vec3f(probe.voxel) + vec3f(0.5);
     {
-	    var randomOffset = vec3f(random(&randomGenerator), random(&randomGenerator), random(&randomGenerator)) - vec3f(0.5);
-	    origin += randomOffset*0.98;
+	    let randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
+	    origin += randomOffset * 0.98;
 	}
+
+	// Found by trial and error
+    const DIRECT_LIGHT_SAMPLING_PROBABILITY = 1.0 / 8.0;
+
+    var direction = vec3f(0.0);
+
+    // TODO: handle the case when emissiveFaces is somehow empty
+    if (random(&randomGenerator) > DIRECT_LIGHT_SAMPLING_PROBABILITY) {
+        direction = randomSphere(&randomGenerator);
+    } else {
+        let face = emissiveFaces[randomUint(&randomGenerator) % arrayLength(&emissiveFaces)];
+        let normal = SIDE_NORMALS[face.side];
+        var randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
+        randomOffset -= normal * dot(randomOffset, normal);
+        let point = vec3f(face.voxel) + vec3f(0.5) + 0.5 * normal + randomOffset;
+        direction = normalize(point - origin);
+    }
+
     let ray = Ray(origin, direction);
 
     var rayColor = vec3f(0.0);
 
-    let raytraceResult = raytraceScene(ray, voxelsTexture);
+    let raytraceResult = raytraceScene(ray, voxelsTexture, true);
+    let directionProbability = (1.0 - DIRECT_LIGHT_SAMPLING_PROBABILITY) / (4.0 * PI) + DIRECT_LIGHT_SAMPLING_PROBABILITY * raytraceResult.emissiveSamplingProbability / f32(arrayLength(&emissiveFaces));
     if (raytraceResult.intersected) {
     	let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, raytraceResult.voxel, 0).r]);
 
@@ -67,7 +92,19 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     }
 
     // Inverse direction probability for Monte-Carlo
-    rayColor *= 4.0 * PI;
+    if (directionProbability > 1e-8) {
+        rayColor /= directionProbability;
+    } else {
+        // Oh no! Anyway,
+        rayColor = vec3f(0.0);
+    }
+
+    // Somehow doing it in getProbeIndex leaves uninitialized data :/
+    if (probe.state == 0u) {
+        probe.colorR = vec4f(0.0);
+        probe.colorG = vec4f(0.0);
+        probe.colorB = vec4f(0.0);
+    }
 
     probe.state += 1u;
 

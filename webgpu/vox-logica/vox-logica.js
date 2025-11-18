@@ -16,6 +16,8 @@ const renderUniformsBufferSize = 224;
 const diffuseProbeSize = 64;
 const diffuseProbesTableSize = 1048576;
 
+const emissiveFaceSize = 16;
+
 const renderMode = 'probes';
 const integrateProbesIterations = 1;
 
@@ -43,6 +45,8 @@ var performanceQuerySet;
 var voxelsTexture;
 var voxelsTextureView;
 var voxelProbeIndexBuffer;
+
+var emissiveFacesBuffer;
 
 var blueNoiseTexture;
 var blueNoiseTextureView;
@@ -95,6 +99,10 @@ var keydown = new Set();
 var trackedKeys = new Set(['a', 'd', 's', 'w']);
 var mouse = null;
 var mouseDelta = [0, 0];
+
+// Voxels state
+
+var voxelTypes = null;
 
 // Camera
 
@@ -301,7 +309,7 @@ function initVoxelTypes()
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
 
-    const voxelTypes = new Uint32Array(256);
+    voxelTypes = new Uint32Array(256);
     // In 0xAABBGGRR format
     // RGB is raw color (albedo / emission)
     // A is 0 mode: 0 for diffuse, 1 for emissive
@@ -485,6 +493,43 @@ function initTestMap()
     voxelProbeIndexInit.fill(0xffffffff);
     device.queue.writeBuffer(voxelProbeIndexBuffer, 0, voxelProbeIndexInit);
 
+    var emissiveFaces = [];
+    for (var i = 0; i < testMap.length; i += 1) {
+        const x = ((i >>  0) & 255);
+        const y = ((i >>  8) & 255);
+        const z = ((i >> 16) & 255);
+
+        if ((voxelTypes[testMap[i]] & 0xff000000) != 0x01000000)
+            continue;
+
+        for (var j = 0; j < 6; j += 1) {
+            let nx = x + (j == 0 ? -1 : j == 1 ? 1 : 0);
+            let ny = y + (j == 2 ? -1 : j == 3 ? 1 : 0);
+            let nz = z + (j == 4 ? -1 : j == 5 ? 1 : 0);
+
+            if (nx < 0 || nx >= 256 || ny < 0 || ny >= 256 || nz < 0 || nz >= 256)
+                continue;
+
+            let index = nx + 256 * (ny + 256 * nz);
+
+            if (testMap[index] != 0)
+                continue;
+
+            emissiveFaces.push(x);
+            emissiveFaces.push(y);
+            emissiveFaces.push(z);
+            emissiveFaces.push(j);
+        }
+    }
+
+    emissiveFacesBuffer = device.createBuffer({
+        label: "emissiveFaces",
+        size: Math.max(1, emissiveFaces.length) * 4,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    })
+
+    device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
+
     console.log("Loaded test map");
 }
 
@@ -522,6 +567,13 @@ function initBindGroups()
                     type: 'storage',
                 },
             },
+            { // Emissive faces
+                binding: 3,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: {
+                    type: 'storage',
+                },
+            },
         ],
     });
 
@@ -539,6 +591,10 @@ function initBindGroups()
             {
                 binding: 2,
                 resource: voxelProbeIndexBuffer,
+            },
+            {
+                binding: 3,
+                resource: emissiveFacesBuffer,
             },
         ],
     });

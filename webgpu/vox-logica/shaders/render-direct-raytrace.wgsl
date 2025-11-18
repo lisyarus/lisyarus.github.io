@@ -26,7 +26,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
     var factor = vec3f(1.0);
 
     for (var bounce = 0u; bounce < 4u; bounce += 1u) {
-        let result = raytraceScene(ray, voxelsTexture);
+        let result = raytraceScene(ray, voxelsTexture, false);
         if (!result.intersected) {
             accumulated += factor * skyColor;
             break;

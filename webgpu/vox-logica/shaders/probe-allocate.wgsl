@@ -26,9 +26,6 @@ fn getProbeIndex(voxel: vec3i) -> u32
 			var probe = DiffuseProbe();
 			probe.voxel = voxel;
 			probe.state = 0u;
-			probe.colorR = vec4f(0.0);
-			probe.colorG = vec4f(0.0);
-			probe.colorB = vec4f(0.0);
 			diffuseProbes[probeIndex] = probe;
 
 			atomicStore(&voxelProbeIndex[voxelIndex], probeIndex);
