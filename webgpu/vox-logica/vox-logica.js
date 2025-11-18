@@ -423,6 +423,16 @@ function updateEmissiveSurfaces()
     device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
 }
 
+function uploadMapSlice(z)
+{
+    device.queue.writeTexture(
+        { texture: voxelsTexture, origin: [0, 0, z] },
+        map,
+        { offset: 256 * 256 * z, bytesPerRow: 256, rowsPerImage: 256 },
+        { width: 256, height: 256 }
+    );
+}
+
 function initMap()
 {
     voxelsTexture = device.createTexture({
@@ -449,7 +459,10 @@ function initMap()
         const y = ((i >>  8) & 255);
         const z = ((i >> 16) & 255);
 
-        if (z == 0 || z == 255 || x == 0 || x == 255 || y == 255) {
+        if (x >= 128 || y >= 128 || z >= 128)
+            continue;
+
+        if (z == 0 || z == 127 || x == 0 || x == 127 || y == 127) {
             map[i] = 1;
         }
     }
@@ -464,14 +477,8 @@ function initMap()
         );
     }
 
-    for (var i = 0; i < 256; i += 1) {
-        device.queue.writeTexture(
-            { texture: voxelsTexture, origin: [0, 0, i] },
-            map,
-            { offset: 256 * 256 * i, bytesPerRow: 256, rowsPerImage: 256 },
-            { width: 256, height: 256 }
-        );
-    }
+    for (var i = 0; i < 256; i += 1)
+        uploadMapSlice(i);
 
     const voxelProbeIndexInit = new Uint32Array(256 * 256 * 256);
     voxelProbeIndexInit.fill(0xffffffff);
