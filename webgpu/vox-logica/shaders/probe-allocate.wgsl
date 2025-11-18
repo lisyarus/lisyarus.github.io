@@ -13,34 +13,36 @@ fn getProbeIndex(voxel: vec3i) -> u32
     let voxelIndex = voxel.x + 256 * (voxel.y + 256 * voxel.z);
     var probeIndex = atomicLoad(&voxelProbeIndex[voxelIndex]);
 
-    if (probeIndex != NULL_INDEX) {
+    if (probeIndex < PENDING_PROBE) {
     	return probeIndex;
     }
 
-	let freeListIndex = atomicAdd(&diffuseProbesCount, 1u);
-	let newProbeIndex = diffuseProbesFreeList[freeListIndex];
 	while (true) {
-		let compareExchangeResult = atomicCompareExchangeWeak(&voxelProbeIndex[voxelIndex], NULL_INDEX, newProbeIndex);
+		let compareExchangeResult = atomicCompareExchangeWeak(&voxelProbeIndex[voxelIndex], NULL_INDEX, PENDING_PROBE);
 		if (compareExchangeResult.exchanged) {
-			probeIndex = newProbeIndex;
+			let freeListIndex = atomicAdd(&diffuseProbesCount, 1u);
+			probeIndex = diffuseProbesFreeList[freeListIndex];
+
+			var probe = DiffuseProbe();
+			probe.voxel = voxel;
+			probe.state = USED_PROBE;
+			probe.colorR = vec4f(0.0);
+			probe.colorG = vec4f(0.0);
+			probe.colorB = vec4f(0.0);
+			diffuseProbes[probeIndex] = probe;
+
+			atomicStore(&voxelProbeIndex[voxelIndex], probeIndex);
+
 			break;
-		} else if (compareExchangeResult.old_value != NULL_INDEX) {
+		} else if (compareExchangeResult.old_value < PENDING_PROBE) {
 			// Another thread spawned the probe
-			// Return our probe to the recycle list
-			diffuseProbesRecycleList[atomicAdd(&diffuseProbesRecycleCount, 1u)] = newProbeIndex;
 			probeIndex = compareExchangeResult.old_value;
 			break;
+		} else if (compareExchangeResult.old_value == PENDING_PROBE) {
+			// Do nothing - wait until another thread 
 		}
 		// Otherwise, continue the CAS loop
 	}
-
-	var probe = DiffuseProbe();
-	probe.voxel = voxel;
-	probe.state = USED_PROBE;
-	probe.colorR = vec4f(0.0);
-	probe.colorG = vec4f(0.0);
-	probe.colorB = vec4f(0.0);
-	diffuseProbes[probeIndex] = probe;
 
 	return probeIndex;
 }

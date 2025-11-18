@@ -372,7 +372,7 @@ function initBuffers()
     device.queue.writeBuffer(diffuseProbesCountBuffer, 0, diffuseProbesCountInit);
 
     const diffuseProbesInit = new Uint32Array(diffuseProbeSize * diffuseProbesTableSize / 4);
-    diffuseProbesInit.fill(0);
+    diffuseProbesInit.fill(0xffffffff);
     device.queue.writeBuffer(diffuseProbesBuffer, 0, diffuseProbesInit);
 
     const diffuseProbesFreeInit = new Uint32Array(diffuseProbesTableSize);

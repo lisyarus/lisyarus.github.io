@@ -5,14 +5,14 @@ struct ProbeID
 }
 
 const NULL_INDEX = 0xffffffffu;
+const PENDING_PROBE = 0xfffffffeu;
 const EMPTY_PROBE = 0u;
-const PENDING_PROBE = 1u;
-const USED_PROBE = 2u;
+const USED_PROBE = 1u;
 
 struct DiffuseProbe
 {
 	voxel: vec3i,
-	state: u32, 
+	state: u32,
 
 	// Per-channel SH coefficients
 	colorR: vec4f,
