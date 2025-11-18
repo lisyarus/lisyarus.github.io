@@ -58,7 +58,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 		    let probeIndex = getProbeIndex(probeVoxel);
 
 		    if (probeIndex != NULL_INDEX) {
-		    	rayColor *= diffuseColor(&diffuseProbes[probeIndex], voxelData.albedo, SIDE_NORMALS[raytraceResult.side]);
+		    	rayColor = diffuseColor(&diffuseProbes[probeIndex], voxelData.albedo, SIDE_NORMALS[raytraceResult.side]);
 	    	}
 	    }
 	    else if (voxelData.mode == VOXEL_EMISSIVE) {
