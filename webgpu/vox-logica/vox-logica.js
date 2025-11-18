@@ -109,8 +109,8 @@ var map = null;
 // Camera
 
 var camera = {
-    position: [128, -192, 128],
-    xangle: 0,
+    position: [32, 4, 48],
+    xangle: - Math.PI * 0.2,
     yangle: 0,
     xfov: Math.PI / 2,
     yfov: Math.PI / 2,
@@ -459,11 +459,41 @@ function initMap()
         const y = ((i >>  8) & 255);
         const z = ((i >> 16) & 255);
 
-        if (x >= 128 || y >= 128 || z >= 128)
-            continue;
-
-        if (z == 0 || z == 127 || x == 0 || x == 127 || y == 127) {
+        const dx = x - 128;
+        const dy = y - 128;
+        const dz = z - 64;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        
+        if (z == 0) {
             map[i] = 1;
+        }
+
+        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
+            map[i] = 2;
+        }
+
+        if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
+            map[i] = 1;
+        }
+
+        if (dx >= -4+32 && dx <= 3+32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
+            map[i] = 1;
+        }
+
+        if ((x == 0 || x == 255 || y == 0 || y == 255) && z <= 31 + 64) {
+            map[i] = 1;
+        }
+
+        if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
+            map[i] = 1;
+        }
+
+        if (d >= 63 && z == 31 + 64) {
+            map[i] = 1;
+        }
+
+        if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
+            map[i] = 0;
         }
     }
 
