@@ -442,6 +442,7 @@ function initTestMap()
 
         const dx = x - 128;
         const dy = y - 128;
+        const dz = z - 64;
         const d = Math.max(Math.abs(dx), Math.abs(dy));
 
         testMap[i] = 0;
@@ -466,13 +467,20 @@ function initTestMap()
             testMap[i] = 1;
         }
 
+        // if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 64) {
+        //     testMap[i] = 1;
+        // }
 
-        if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 64) {
+        if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
             testMap[i] = 1;
         }
 
         if (d >= 63 && z == 31 + 64) {
             testMap[i] = 1;
+        }
+
+        if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
+            testMap[i] = 0;
         }
 
         // testMap[i] = 0;
