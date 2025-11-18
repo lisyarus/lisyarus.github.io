@@ -16,8 +16,6 @@ const renderUniformsBufferSize = 224;
 const diffuseProbeSize = 64;
 const diffuseProbesTableSize = 1048576;
 
-const emissiveFaceSize = 16;
-
 const renderMode = 'probes';
 const integrateProbesIterations = 1;
 
@@ -433,7 +431,7 @@ function initTestMap()
         }
 
         if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
-            testMap[i] = 2;
+            testMap[i] = 0;
         }
 
         if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
@@ -493,7 +491,7 @@ function initTestMap()
     voxelProbeIndexInit.fill(0xffffffff);
     device.queue.writeBuffer(voxelProbeIndexBuffer, 0, voxelProbeIndexInit);
 
-    var emissiveFaces = [];
+    var emissiveFaces = [0, 0, 0, 0];
     for (var i = 0; i < testMap.length; i += 1) {
         const x = ((i >>  0) & 255);
         const y = ((i >>  8) & 255);
@@ -524,7 +522,7 @@ function initTestMap()
 
     emissiveFacesBuffer = device.createBuffer({
         label: "emissiveFaces",
-        size: Math.max(1, emissiveFaces.length) * 4,
+        size: emissiveFaces.length * 4,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     })
 
