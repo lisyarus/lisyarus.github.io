@@ -418,7 +418,7 @@ function updateEmissiveSurfaces()
             emissiveFaces.push(j);
         }
     }
-    emissiveFaces[0] = emissiveFaces.length - 1;
+    emissiveFaces[0] = emissiveFaces.length / 4 - 1;
 
     device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
 }
