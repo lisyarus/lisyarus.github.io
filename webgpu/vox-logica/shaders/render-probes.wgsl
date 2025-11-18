@@ -40,13 +40,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
 	    	return vec4f(0.0, 0.0, 0.0, 1.0);
 	    }
 
-    	let diffuseSH = diffuseFromSH1(SIDE_NORMALS[raytraceResult.side]);
-    	var color = vec3f(0.0);
-    	color.r = dot(diffuseSH, diffuseProbes[probeIndex].colorR);
-    	color.g = dot(diffuseSH, diffuseProbes[probeIndex].colorG);
-    	color.b = dot(diffuseSH, diffuseProbes[probeIndex].colorB);
-
-	    return vec4f(color * voxelData.albedo / PI, 1.0);
+	    return vec4f(diffuseColor(&diffuseProbes[probeIndex], voxelData.albedo, SIDE_NORMALS[raytraceResult.side]), 1.0);
     }
     else if (voxelData.mode == VOXEL_EMISSIVE) {
 	    return vec4f(voxelData.emission, 1.0);

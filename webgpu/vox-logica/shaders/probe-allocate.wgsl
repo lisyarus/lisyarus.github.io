@@ -25,7 +25,7 @@ fn getProbeIndex(voxel: vec3i) -> u32
 
 			var probe = DiffuseProbe();
 			probe.voxel = voxel;
-			probe.state = USED_PROBE;
+			probe.state = 0u;
 			probe.colorR = vec4f(0.0);
 			probe.colorG = vec4f(0.0);
 			probe.colorB = vec4f(0.0);

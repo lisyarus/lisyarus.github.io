@@ -29,7 +29,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
 	var probe = diffuseProbes[id.x];
 
-	if (probe.state != USED_PROBE) {
+	if (probe.state == EMPTY_PROBE) {
 		return;
 	}
 
@@ -58,12 +58,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 		    let probeIndex = getProbeIndex(probeVoxel);
 
 		    if (probeIndex != NULL_INDEX) {
-		    	let diffuseSH = diffuseFromSH1(SIDE_NORMALS[raytraceResult.side]);
-		    	rayColor.r = dot(diffuseSH, diffuseProbes[probeIndex].colorR);
-		    	rayColor.g = dot(diffuseSH, diffuseProbes[probeIndex].colorG);
-		    	rayColor.b = dot(diffuseSH, diffuseProbes[probeIndex].colorB);
-
-		    	rayColor *= voxelData.albedo / PI;
+		    	rayColor *= diffuseColor(&diffuseProbes[probeIndex], voxelData.albedo, SIDE_NORMALS[raytraceResult.side]);
 	    	}
 	    }
 	    else if (voxelData.mode == VOXEL_EMISSIVE) {
@@ -76,12 +71,12 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
     // Inverse direction probability for Monte-Carlo
     rayColor *= 4.0 * PI;
 
-    let mu = 1.0 / 256.0;
+    probe.state += 1u;
 
     let directionSH = evalSH1(direction);
-    probe.colorR = mix(probe.colorR, rayColor.r * directionSH, mu);
-    probe.colorG = mix(probe.colorG, rayColor.g * directionSH, mu);
-    probe.colorB = mix(probe.colorB, rayColor.b * directionSH, mu);
+    probe.colorR = mix(probe.colorR, rayColor.r * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
+    probe.colorG = mix(probe.colorG, rayColor.g * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
+    probe.colorB = mix(probe.colorB, rayColor.b * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
 
     diffuseProbes[id.x] = probe;
 }
