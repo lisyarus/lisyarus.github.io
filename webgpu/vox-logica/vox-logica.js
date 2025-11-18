@@ -94,7 +94,7 @@ var waitingForPerformanceQuery = false;
 
 var lastFrameTimestamp = window.performance.now() / 1000.0;
 var keydown = new Set();
-var trackedKeys = new Set(['a', 'd', 's', 'w']);
+var trackedKeys = new Set(['KeyA', 'KeyD', 'KeyS', 'KeyW', 'ShiftLeft']);
 var mouse = null;
 var mouseDelta = [0, 0];
 
@@ -214,15 +214,15 @@ function initCanvas()
 	canvas = document.getElementById("mainCanvas");
 
     window.addEventListener('keydown', function(event) {
-        keydown.add(event.key);
-        if (trackedKeys.has(event.key)) {
+        keydown.add(event.code);
+        if (trackedKeys.has(event.code)) {
             event.preventDefault();
         }
     }, false);
 
     window.addEventListener('keyup', function(event) {
-        keydown.delete(event.key);
-        if (trackedKeys.has(event.key)) {
+        keydown.delete(event.code);
+        if (trackedKeys.has(event.code)) {
             event.preventDefault();
         }
     }, false);
@@ -874,18 +874,18 @@ function redraw()
         camera.yangle += mouseDelta[1] * cameraRotationSpeed;
         camera.yangle = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, camera.yangle));
 
-        const cameraSpeed = 256.0;
+        const cameraSpeed = keydown.has('ShiftLeft') ? 256 : 64;
         let cameraMovement = [0.0, 0.0, 0.0];
-        if (keydown.has('a')) {
+        if (keydown.has('KeyA')) {
             cameraMovement[0] -= 1.0;
         }
-        if (keydown.has('d')) {
+        if (keydown.has('KeyD')) {
             cameraMovement[0] += 1.0;
         }
-        if (keydown.has('s')) {
+        if (keydown.has('KeyS')) {
             cameraMovement[1] -= 1.0;
         }
-        if (keydown.has('w')) {
+        if (keydown.has('KeyW')) {
             cameraMovement[1] += 1.0;
         }
 
