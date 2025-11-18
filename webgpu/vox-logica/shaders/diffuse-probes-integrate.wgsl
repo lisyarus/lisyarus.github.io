@@ -7,8 +7,6 @@
 @group(1) @binding(0) var<storage, read_write> diffuseProbesCount: atomic<u32>;
 @group(1) @binding(1) var<storage, read_write> diffuseProbes: array<DiffuseProbe>;
 @group(1) @binding(2) var<storage, read_write> diffuseProbesFreeList: array<u32>;
-@group(1) @binding(3) var<storage, read_write> diffuseProbesRecycleCount: atomic<u32>;
-@group(1) @binding(4) var<storage, read_write> diffuseProbesRecycleList: array<u32>;
 
 %include uniforms.wgsl
 

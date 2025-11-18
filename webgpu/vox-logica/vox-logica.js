@@ -27,9 +27,6 @@ var diffuseProbesCountBuffer;
 var diffuseProbesCountMapBuffer;
 var diffuseProbesBuffer;
 var diffuseProbesFreeBuffer;
-var diffuseProbesRecycleCountBuffer;
-var diffuseProbesRecycleBuffer;
-var diffuseProbesRecycleWorkgroupCountBuffer;
 
 var renderUniformsBuffer;
 
@@ -61,9 +58,6 @@ var voxelsBindGroup;
 var probesBindGroupLayout;
 var probesBindGroup;
 
-var probesRecyclePrepareBindGroupLayout;
-var probesRecyclePrepareBindGroup;
-
 var renderUniformsBindGroupLayout;
 var renderUniformsBindGroup;
 
@@ -74,7 +68,6 @@ var composeBindGroup;
 
 var renderDirectRaytraceShaderModule;
 var renderProbesShaderModule;
-var diffuseProbesRecycleShaderModule;
 var diffuseProbesIntegrateShaderModule;
 var composeShaderModule;
 
@@ -82,8 +75,6 @@ var composeShaderModule;
 
 var renderDirectRaytracePipeline;
 var renderProbesPipeline;
-var diffuseProbesRecyclePreparePipeline;
-var diffuseProbesRecyclePipeline;
 var diffuseProbesIntegratePipeline;
 var composePipeline;
 
@@ -349,24 +340,6 @@ function initBuffers()
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
 
-    diffuseProbesRecycleCountBuffer = device.createBuffer({
-        label: "diffuseProbesRecycleCount",
-        size: 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-
-    diffuseProbesRecycleBuffer = device.createBuffer({
-        label: "diffuseProbesRecycle",
-        size: 4 * diffuseProbesTableSize,
-        usage: GPUBufferUsage.STORAGE,
-    });
-
-    diffuseProbesRecycleWorkgroupCountBuffer = device.createBuffer({
-        label: "diffuseProbesRecycleWorkgroupCount",
-        size: 12,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT,
-    });
-
     const diffuseProbesCountInit = new Uint32Array(1);
     diffuseProbesCountInit.fill(0);
     device.queue.writeBuffer(diffuseProbesCountBuffer, 0, diffuseProbesCountInit);
@@ -593,20 +566,6 @@ function initBindGroups()
                     type: 'storage',
                 },
             },
-            { // Diffuse probes recycle count
-                binding: 3,
-                visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
-                },
-            },
-            { // Diffuse probes recycle list
-                binding: 4,
-                visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
-                },
-            },
         ],
     });
 
@@ -624,36 +583,6 @@ function initBindGroups()
             {
                 binding: 2,
                 resource: diffuseProbesFreeBuffer,
-            },
-            {
-                binding: 3,
-                resource: diffuseProbesRecycleCountBuffer,
-            },
-            {
-                binding: 4,
-                resource: diffuseProbesRecycleBuffer,
-            },
-        ],
-    });
-
-    probesRecyclePrepareBindGroupLayout = device.createBindGroupLayout({
-        entries: [
-            { // Probes recycle workgroup count
-                binding: 0,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
-                },
-            },
-        ],
-    });
-
-    probesRecyclePrepareBindGroup = device.createBindGroup({
-        layout: probesRecyclePrepareBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: diffuseProbesRecycleWorkgroupCountBuffer,
             },
         ],
     });
@@ -701,7 +630,6 @@ async function initShaderModules()
 {
     renderDirectRaytraceShaderModule = await loadShaderModule("render-direct-raytrace.wgsl");
     renderProbesShaderModule = await loadShaderModule("render-probes.wgsl");
-    diffuseProbesRecycleShaderModule = await loadShaderModule("diffuse-probes-recycle.wgsl");
     diffuseProbesIntegrateShaderModule = await loadShaderModule("diffuse-probes-integrate.wgsl");
 	composeShaderModule = await loadShaderModule("compose.wgsl");
 }
@@ -768,31 +696,6 @@ function initPipelines()
                 },
             ],
         }
-    });
-
-    diffuseProbesRecyclePreparePipeline = device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [
-                probesBindGroupLayout,
-                probesRecyclePrepareBindGroupLayout,
-            ],
-        }),
-        compute: {
-            module: diffuseProbesRecycleShaderModule,
-            entryPoint: 'recyclePrepare',
-        },
-    });
-
-    diffuseProbesRecyclePipeline = device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [
-                probesBindGroupLayout,
-            ],
-        }),
-        compute: {
-            module: diffuseProbesRecycleShaderModule,
-            entryPoint: 'recycleMain',
-        },
     });
 
     diffuseProbesIntegratePipeline = device.createComputePipeline({
@@ -968,8 +871,6 @@ function redraw()
     }
 
     device.queue.writeBuffer(renderUniformsBuffer, 0, renderUniforms);
-
-    device.queue.writeBuffer(diffuseProbesRecycleCountBuffer, 0, (new Uint32Array(1)).fill(0));
  
     const encoder = device.createCommandEncoder({});
 
@@ -1034,15 +935,6 @@ function redraw()
         mainPass.setPipeline(renderProbesPipeline);
         mainPass.draw(3);
         mainPass.end();
-
-        const recycleProbesPass = encoder.beginComputePass({});
-        recycleProbesPass.setBindGroup(0, probesBindGroup);
-        recycleProbesPass.setBindGroup(1, probesRecyclePrepareBindGroup);
-        recycleProbesPass.setPipeline(diffuseProbesRecyclePreparePipeline);
-        recycleProbesPass.dispatchWorkgroups(1);
-        recycleProbesPass.setPipeline(diffuseProbesRecyclePipeline);
-        recycleProbesPass.dispatchWorkgroupsIndirect(diffuseProbesRecycleWorkgroupCountBuffer, 0);
-        recycleProbesPass.end();
     }
  
     const composeRenderPass = encoder.beginRenderPass({
