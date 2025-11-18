@@ -872,6 +872,7 @@ function redraw()
         const cameraRotationSpeed = 0.004;
         camera.xangle -= mouseDelta[0] * cameraRotationSpeed;
         camera.yangle += mouseDelta[1] * cameraRotationSpeed;
+        camera.yangle = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, camera.yangle));
 
         const cameraSpeed = 256.0;
         let cameraMovement = [0.0, 0.0, 0.0];
