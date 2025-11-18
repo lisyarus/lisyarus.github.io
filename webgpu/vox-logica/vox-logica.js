@@ -101,20 +101,13 @@ var mouseDelta = [0, 0];
 // Voxels state
 
 var voxelTypes = null;
+var map = null;
 
 // Camera
 
-// var camera = {
-//     position: [128, -200, 64],
-//     xangle: 0,
-//     yangle: 0,
-//     xfov: Math.PI / 2,
-//     yfov: Math.PI / 2,
-// };
-
 var camera = {
-    position: [32, 4, 48],
-    xangle: - Math.PI * 0.2,
+    position: [128, -192, 128],
+    xangle: 0,
     yangle: 0,
     xfov: Math.PI / 2,
     yfov: Math.PI / 2,
@@ -392,7 +385,47 @@ function initQuerySets()
     }
 }
 
-function initTestMap()
+function updateEmissiveSurfaces()
+{
+    var emissiveFaces = [0, 0, 0, 0];
+    for (var i = 0; i < map.length; i += 1) {
+        const x = ((i >>  0) & 255);
+        const y = ((i >>  8) & 255);
+        const z = ((i >> 16) & 255);
+
+        if ((voxelTypes[map[i]] & 0xff000000) != 0x01000000)
+            continue;
+
+        for (var j = 0; j < 6; j += 1) {
+            let nx = x + (j == 0 ? -1 : j == 1 ? 1 : 0);
+            let ny = y + (j == 2 ? -1 : j == 3 ? 1 : 0);
+            let nz = z + (j == 4 ? -1 : j == 5 ? 1 : 0);
+
+            if (nx < 0 || nx >= 256 || ny < 0 || ny >= 256 || nz < 0 || nz >= 256)
+                continue;
+
+            let index = nx + 256 * (ny + 256 * nz);
+
+            if (map[index] != 0)
+                continue;
+
+            emissiveFaces.push(x);
+            emissiveFaces.push(y);
+            emissiveFaces.push(z);
+            emissiveFaces.push(j);
+        }
+    }
+
+    emissiveFacesBuffer = device.createBuffer({
+        label: "emissiveFaces",
+        size: emissiveFaces.length * 4,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    })
+
+    device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
+}
+
+function initMap()
 {
     voxelsTexture = device.createTexture({
         label: "voxels",
@@ -410,69 +443,24 @@ function initTestMap()
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     })
 
-    const testMap = new Uint8Array(256 * 256 * 256);
+    map = new Uint8Array(256 * 256 * 256);
+    map.fill(0);
 
-    testMap.fill(0);
-
-    for (var i = 0; i < testMap.length; i += 1) {
+    for (var i = 0; i < map.length; i += 1) {
         const x = ((i >>  0) & 255);
         const y = ((i >>  8) & 255);
         const z = ((i >> 16) & 255);
 
-        const dx = x - 128;
-        const dy = y - 128;
-        const dz = z - 64;
-        const d = Math.max(Math.abs(dx), Math.abs(dy));
-
-        testMap[i] = 0;
-
-        if (z == 0) {
-            testMap[i] = 1;
+        if (z == 0 || z == 255 || x == 0 || x == 255 || y == 255) {
+            map[i] = 1;
         }
-
-        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
-            testMap[i] = 0;
-        }
-
-        if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            testMap[i] = 1;
-        }
-
-        if (dx >= -4+32 && dx <= 3+32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            testMap[i] = 1;
-        }
-
-        if ((x == 0 || x == 255 || y == 0 || y == 255) && z <= 31 + 64) {
-            testMap[i] = 1;
-        }
-
-        // if ((d >= 63 && d <= 65) && ((Math.floor(x/2) % 4) == 0) && ((Math.floor(y/2) % 4) == 0) && z <= 31 + 64) {
-        //     testMap[i] = 1;
-        // }
-
-        if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
-            testMap[i] = 1;
-        }
-
-        if (d >= 63 && z == 31 + 64) {
-            testMap[i] = 1;
-        }
-
-        if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
-            testMap[i] = 0;
-        }
-
-        // testMap[i] = 0;
-        // if (x > 0 && x < 255 && y > 0 && y < 255 && z > 0 && z < 255) {
-        //     testMap[i] = 1;
-        // }
     }
 
     if (false) {
         // For some reason this loads just the first layer :/
         device.queue.writeTexture(
             { texture: voxelsTexture },
-            testMap,
+            map,
             { bytesPerRow: 256, rowsPerImage: 256 },
             { width: 256, height: 256, depthOrArraySlices: 256 }
         );
@@ -481,7 +469,7 @@ function initTestMap()
     for (var i = 0; i < 256; i += 1) {
         device.queue.writeTexture(
             { texture: voxelsTexture, origin: [0, 0, i] },
-            testMap,
+            map,
             { offset: 256 * 256 * i, bytesPerRow: 256, rowsPerImage: 256 },
             { width: 256, height: 256 }
         );
@@ -491,50 +479,13 @@ function initTestMap()
     voxelProbeIndexInit.fill(0xffffffff);
     device.queue.writeBuffer(voxelProbeIndexBuffer, 0, voxelProbeIndexInit);
 
-    var emissiveFaces = [0, 0, 0, 0];
-    for (var i = 0; i < testMap.length; i += 1) {
-        const x = ((i >>  0) & 255);
-        const y = ((i >>  8) & 255);
-        const z = ((i >> 16) & 255);
+    updateEmissiveSurfaces();
 
-        if ((voxelTypes[testMap[i]] & 0xff000000) != 0x01000000)
-            continue;
-
-        for (var j = 0; j < 6; j += 1) {
-            let nx = x + (j == 0 ? -1 : j == 1 ? 1 : 0);
-            let ny = y + (j == 2 ? -1 : j == 3 ? 1 : 0);
-            let nz = z + (j == 4 ? -1 : j == 5 ? 1 : 0);
-
-            if (nx < 0 || nx >= 256 || ny < 0 || ny >= 256 || nz < 0 || nz >= 256)
-                continue;
-
-            let index = nx + 256 * (ny + 256 * nz);
-
-            if (testMap[index] != 0)
-                continue;
-
-            emissiveFaces.push(x);
-            emissiveFaces.push(y);
-            emissiveFaces.push(z);
-            emissiveFaces.push(j);
-        }
-    }
-
-    emissiveFacesBuffer = device.createBuffer({
-        label: "emissiveFaces",
-        size: emissiveFaces.length * 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    })
-
-    device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
-
-    console.log("Loaded test map");
+    console.log("Loaded map");
 }
 
 async function initTextures()
 {
-    initTestMap();
-
     blueNoiseTexture = await loadTexture("/webgpu/blue-noise.png", 'rgba8unorm-srgb', GPUTextureUsage.TEXTURE_BINDING);
     blueNoiseTextureView = blueNoiseTexture.createView({});
 }
@@ -834,6 +785,7 @@ export async function init()
     initBuffers();
     initQuerySets();
     await initTextures();
+    initMap();
     initBindGroups();
     await initShaderModules();
     initPipelines();
