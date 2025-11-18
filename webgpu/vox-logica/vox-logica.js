@@ -1117,6 +1117,7 @@ function redraw()
     }
 
     var debugText = "";
+    debugText += "Frame: " + frameID + "\n";
     debugText += "Diffuse probes: " + debugInfo.diffuseProbes + "\n";
     debugText += "Integrate: " + debugInfo.integrateTime + "\n";
     debugText += "Render:    " + debugInfo.renderTime + "\n";
