@@ -73,10 +73,12 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
     probe.state += 1u;
 
+    let mu = select(DIFFUSE_PROBE_LEARNING_RATE, 1.0 / f32(probe.state), FULL_CONVERGE);
+
     let directionSH = evalSH1(direction);
-    probe.colorR = mix(probe.colorR, rayColor.r * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
-    probe.colorG = mix(probe.colorG, rayColor.g * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
-    probe.colorB = mix(probe.colorB, rayColor.b * directionSH, DIFFUSE_PROBE_LEARNING_RATE);
+    probe.colorR = mix(probe.colorR, rayColor.r * directionSH, mu);
+    probe.colorG = mix(probe.colorG, rayColor.g * directionSH, mu);
+    probe.colorB = mix(probe.colorB, rayColor.b * directionSH, mu);
 
     diffuseProbes[id.x] = probe;
 }

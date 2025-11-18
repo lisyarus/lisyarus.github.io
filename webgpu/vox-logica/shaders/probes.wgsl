@@ -11,6 +11,7 @@ const PENDING_PROBE = 0xfffffffeu;
 const EMPTY_PROBE = 0xffffffffu;
 
 const DIFFUSE_PROBE_LEARNING_RATE = 1.0 / 256.0;
+const FULL_CONVERGE = false;
 
 struct DiffuseProbe
 {
@@ -37,5 +38,5 @@ fn diffuseColor(probe: ptr<storage, DiffuseProbe, read_write>, albedo: vec3f, no
 		dot(diffuseSH, (*probe).colorB)
 	);
 
-	return color * albedo / PI / (1.0 - pow(1.0 - DIFFUSE_PROBE_LEARNING_RATE, f32((*probe).state)));
+	return color * albedo / PI / select(1.0 - pow(1.0 - DIFFUSE_PROBE_LEARNING_RATE, f32((*probe).state)), 1.0, FULL_CONVERGE);
 }
