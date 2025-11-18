@@ -107,9 +107,17 @@ var mouseDelta = [0, 0];
 
 // Camera
 
+// var camera = {
+//     position: [128, -200, 64],
+//     xangle: 0,
+//     yangle: 0,
+//     xfov: Math.PI / 2,
+//     yfov: Math.PI / 2,
+// };
+
 var camera = {
-    position: [128, -200, 64],
-    xangle: 0,
+    position: [4, 4, 64],
+    xangle: - Math.PI / 4,
     yangle: 0,
     xfov: Math.PI / 2,
     yfov: Math.PI / 2,
