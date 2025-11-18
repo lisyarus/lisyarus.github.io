@@ -4,11 +4,19 @@ struct EmissiveFace
 	side: u32,
 }
 
+struct EmissiveFaces
+{
+    count: u32,
+    unused1: u32,
+    unused2: u32,
+    unused3: u32,
+    faces: array<EmissiveFace>,
+}
+
 @group(0) @binding(0) var<storage, read> voxelTypes : array<u32, 256>;
 @group(0) @binding(1) var voxelsTexture : texture_3d<u32>;
 @group(0) @binding(2) var<storage, read_write> voxelProbeIndex : array<atomic<u32>>;
-// NB: first face is unused, to prevent empty buffer when there are no emissive faces
-@group(0) @binding(3) var<storage, read_write> emissiveFaces: array<EmissiveFace>;
+@group(0) @binding(3) var<storage, read_write> emissiveFaces: EmissiveFaces;
 
 %include probes.wgsl
 
@@ -53,14 +61,14 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
 	// Found by trial and error
     const DIRECT_LIGHT_SAMPLING_PROBABILITY = 1.0 / 8.0;
-    let useDirectLightSampling = arrayLength(&emissiveFaces) > 1u;
+    let useDirectLightSampling = emissiveFaces.count > 0u;
 
     var direction = vec3f(0.0);
 
     if (!useDirectLightSampling || random(&randomGenerator) > DIRECT_LIGHT_SAMPLING_PROBABILITY) {
         direction = randomSphere(&randomGenerator);
     } else {
-        let face = emissiveFaces[1u + (randomUint(&randomGenerator) % (arrayLength(&emissiveFaces) - 1u))];
+        let face = emissiveFaces.faces[randomUint(&randomGenerator) % emissiveFaces.count];
         let normal = SIDE_NORMALS[face.side];
         var randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
         randomOffset -= normal * dot(randomOffset, normal);
@@ -76,7 +84,7 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 
     let directionProbability = select(
         1.0 / (4.0 * PI),
-        (1.0 - DIRECT_LIGHT_SAMPLING_PROBABILITY) / (4.0 * PI) + DIRECT_LIGHT_SAMPLING_PROBABILITY * raytraceResult.emissiveSamplingProbability / f32(arrayLength(&emissiveFaces) - 1u),
+        (1.0 - DIRECT_LIGHT_SAMPLING_PROBABILITY) / (4.0 * PI) + DIRECT_LIGHT_SAMPLING_PROBABILITY * raytraceResult.emissiveSamplingProbability / f32(emissiveFaces.count),
         useDirectLightSampling
     );
 

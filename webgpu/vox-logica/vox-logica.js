@@ -16,6 +16,9 @@ const renderUniformsBufferSize = 224;
 const diffuseProbeSize = 64;
 const diffuseProbesTableSize = 1048576;
 
+const emissiveFaceSize = 16;
+const emissiveFacesTableSize = 1048576;
+
 const renderMode = 'probes';
 const integrateProbesIterations = 1;
 
@@ -415,12 +418,7 @@ function updateEmissiveSurfaces()
             emissiveFaces.push(j);
         }
     }
-
-    emissiveFacesBuffer = device.createBuffer({
-        label: "emissiveFaces",
-        size: emissiveFaces.length * 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    })
+    emissiveFaces[0] = emissiveFaces.length - 1;
 
     device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
 }
@@ -433,7 +431,7 @@ function initMap()
         format: 'r8uint',
         size: [256, 256, 256],
         usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
-    })
+    });
 
     voxelsTextureView = voxelsTexture.createView({});
 
@@ -441,7 +439,7 @@ function initMap()
         label: "voxelsProbeIndex",
         size: 256 * 256 * 256 * 4,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    })
+    });
 
     map = new Uint8Array(256 * 256 * 256);
     map.fill(0);
@@ -478,6 +476,12 @@ function initMap()
     const voxelProbeIndexInit = new Uint32Array(256 * 256 * 256);
     voxelProbeIndexInit.fill(0xffffffff);
     device.queue.writeBuffer(voxelProbeIndexBuffer, 0, voxelProbeIndexInit);
+
+    emissiveFacesBuffer = device.createBuffer({
+        label: "emissiveFaces",
+        size: emissiveFaceSize * emissiveFacesTableSize,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    })
 
     updateEmissiveSurfaces();
 
