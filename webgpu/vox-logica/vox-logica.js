@@ -105,6 +105,7 @@ var mouseDelta = [0, 0];
 
 var voxelTypes = null;
 var map = null;
+var emissiveFacesCount = 0;
 
 // Camera
 
@@ -310,6 +311,11 @@ function initVoxelTypes()
     voxelTypes[0] = 0x00000000; // zero is always empty space, the value is meaningless
     voxelTypes[1] = 0x00c0c0c0; // light-grey diffuse
     voxelTypes[2] = 0x012060ff; // orange emissive
+    voxelTypes[3] = 0x01ff6020; // light-blue emissive
+    voxelTypes[4] = 0x0160ff20; // light-green emissive
+    voxelTypes[5] = 0x016020ff; // light-magenta emissive
+    voxelTypes[6] = 0x01ff2060; // light-magenta emissive
+    voxelTypes[7] = 0x0120ff60; // light-magenta emissive
 
     device.queue.writeBuffer(voxelTypesBuffer, 0, voxelTypes);
 }
@@ -419,6 +425,7 @@ function updateEmissiveSurfaces()
         }
     }
     emissiveFaces[0] = emissiveFaces.length / 4 - 1;
+    emissiveFacesCount = emissiveFaces[0];
 
     device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
 }
@@ -496,6 +503,24 @@ function initMap()
             map[i] = 0;
         }
     }
+
+    if(false)
+    for (var i = 0; i < map.length; i += 1) {
+        const x = ((i >>  0) & 255);
+        const y = ((i >>  8) & 255);
+        const z = ((i >> 16) & 255);
+
+        if (z == 1 && ((x % 16) == 7) && ((y % 16) == 7) && x < 128 && y < 128) {
+            map[i] = 2 + Math.min(5, Math.floor((Math.abs(579.14765 * Math.sin(152.43675 * i)) % 1) * 6));
+            for (var dz = 0; dz < 4; dz += 1) {
+                map[i + 65536 * dz] = map[i];
+                map[i+1 + 65536 * dz] = map[i];
+                map[i+256 + 65536 * dz] = map[i];
+                map[i+257 + 65536 * dz] = map[i];
+            }
+        }
+    }
+
 
     if (false) {
         // For some reason this loads just the first layer :/
@@ -914,6 +939,7 @@ function redraw()
         // const skyColor = [0.1, 0.2, 0.3, 1.0];
         const skyColor = [0.4, 0.7, 1.0, 1.0];
         // const skyColor = [1.0, 1.0, 1.0, 1.0];
+        // const skyColor = [0.0, 0.0, 0.0, 1.0];
         for (var i = 0; i < 4; i += 1)
             renderUniformsFloat[i + 52] = skyColor[i];
     }
@@ -945,7 +971,11 @@ function redraw()
         mainPass.end();
     }
 
+    // const paused = frameID >= 512;
+    const paused = false;
+
     if (renderMode == 'probes') {
+        if (!paused)
         for (var i = 0; i < integrateProbesIterations; i += 1) {
             const integrateProbesPass = encoder.beginComputePass({
                 ...(timestampQuerySupported) && { timestampWrites: {
@@ -1059,6 +1089,7 @@ function redraw()
     var debugText = "";
     debugText += "Frame: " + frameID + "\n";
     debugText += "Diffuse probes: " + debugInfo.diffuseProbes + "\n";
+    debugText += "Emissive faces: " + emissiveFacesCount + "\n";
     debugText += "Integrate: " + debugInfo.integrateTime + "\n";
     debugText += "Render:    " + debugInfo.renderTime + "\n";
     debugText += "Compose:   " + debugInfo.composeTime + "\n";
@@ -1067,6 +1098,7 @@ function redraw()
     ++framesInFlight;
     device.queue.onSubmittedWorkDone().then(() => { --framesInFlight; });
 
-    ++frameID;
+    if (!paused)
+        ++frameID;
     requestAnimationFrame(redraw);
 }

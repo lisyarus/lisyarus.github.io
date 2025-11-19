@@ -59,34 +59,85 @@ fn integrateMain(@builtin(global_invocation_id) id: vec3u)
 	    origin += randomOffset * 0.98;
 	}
 
-	// Found by trial and error
-    const DIRECT_LIGHT_SAMPLING_PROBABILITY = 1.0 / 8.0;
-    let useDirectLightSampling = emissiveFaces.count > 0u;
+    const USE_RESTIR = false;
 
     var direction = vec3f(0.0);
+    var directionProbability = 0.0;
+    var raytraceResult = NO_INTERSECTION;
 
-    if (!useDirectLightSampling || random(&randomGenerator) > DIRECT_LIGHT_SAMPLING_PROBABILITY) {
-        direction = randomSphere(&randomGenerator);
+    if (!USE_RESTIR) {
+        // Found by trial and error
+        const DIRECT_LIGHT_SAMPLING_PROBABILITY = 1.0 / 8.0;
+        let useDirectLightSampling = emissiveFaces.count > 0u;
+
+        if (!useDirectLightSampling || random(&randomGenerator) > DIRECT_LIGHT_SAMPLING_PROBABILITY) {
+            direction = randomSphere(&randomGenerator);
+        } else {
+            let face = emissiveFaces.faces[randomUint(&randomGenerator) % emissiveFaces.count];
+            let normal = SIDE_NORMALS[face.side];
+            var randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
+            randomOffset -= normal * dot(randomOffset, normal);
+            let point = vec3f(face.voxel) + vec3f(0.5) + 0.5 * normal + randomOffset;
+            direction = normalize(point - origin);
+        }
+
+        let ray = Ray(origin, direction);
+        raytraceResult = raytraceScene(ray, voxelsTexture, true);
+        directionProbability = select(
+            1.0 / (4.0 * PI),
+            (1.0 - DIRECT_LIGHT_SAMPLING_PROBABILITY) / (4.0 * PI) + DIRECT_LIGHT_SAMPLING_PROBABILITY * raytraceResult.emissiveSamplingProbability / f32(emissiveFaces.count),
+            useDirectLightSampling
+        );
     } else {
-        let face = emissiveFaces.faces[randomUint(&randomGenerator) % emissiveFaces.count];
-        let normal = SIDE_NORMALS[face.side];
-        var randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
-        randomOffset -= normal * dot(randomOffset, normal);
-        let point = vec3f(face.voxel) + vec3f(0.5) + 0.5 * normal + randomOffset;
-        direction = normalize(point - origin);
+        // See https://agraphicsguynotes.com/posts/understanding_the_math_behind_restir_di/#resampled-importance-sampling-ris
+        // and https://agraphicsguynotes.com/posts/understanding_the_math_behind_restir_gi/#per-initial-candidate-target-function-in-ris
+        var reservoirSample = vec3f(1.0, 0.0, 0.0);
+        var reservoirSumWeights = 0.0;
+        var reservoirSampleTargetPdf = 0.0;
+
+        const RESERVOIR_SAMPLES = 16u;
+        for (var i = 0u; i < RESERVOIR_SAMPLES; i += 1u) {
+            const DIRECT_LIGHT_SAMPLING_PROBABILITY = 1.0 / 8.0;
+            const UNIFORM_LIGHT_SAMPLING_WEIGHT = 1.0 / 256.0;
+            let useDirectLightSampling = emissiveFaces.count > 0u;
+
+            var sample = vec3f(0.0);
+            var sampleTargetPdf = 0.0;
+            var sampleWeight = 0.0;
+
+            if (!useDirectLightSampling || random(&randomGenerator) > DIRECT_LIGHT_SAMPLING_PROBABILITY) {
+                sample = randomSphere(&randomGenerator);
+                sampleTargetPdf = UNIFORM_LIGHT_SAMPLING_WEIGHT;
+                sampleWeight = sampleTargetPdf * (4.0 * PI);
+            } else {
+                let face = emissiveFaces.faces[randomUint(&randomGenerator) % emissiveFaces.count];
+                let normal = SIDE_NORMALS[face.side];
+                var randomOffset = randomCube(&randomGenerator) - vec3f(0.5);
+                randomOffset -= normal * dot(randomOffset, normal);
+                let point = vec3f(face.voxel) + vec3f(0.5) + 0.5 * normal + randomOffset;
+                let delta = point - origin;
+                sample = normalize(delta);
+                sampleTargetPdf = max(0.0, dot(-sample, normal)) / dot(delta, delta);
+                sampleWeight = sampleTargetPdf * sampleTargetPdf * f32(emissiveFaces.count);
+            }
+
+            reservoirSumWeights += sampleWeight;
+            if (random(&randomGenerator) <= sampleWeight / reservoirSumWeights) {
+                reservoirSample = sample;
+                reservoirSampleTargetPdf = sampleTargetPdf;
+            }
+        }
+
+        direction = reservoirSample;
+        if (reservoirSumWeights > 0.0) {
+            let ray = Ray(origin, direction);
+
+            raytraceResult = raytraceScene(ray, voxelsTexture, false);
+            directionProbability = reservoirSampleTargetPdf * f32(RESERVOIR_SAMPLES) / reservoirSumWeights;
+        }
     }
 
-    let ray = Ray(origin, direction);
-
     var rayColor = vec3f(0.0);
-
-    let raytraceResult = raytraceScene(ray, voxelsTexture, true);
-
-    let directionProbability = select(
-        1.0 / (4.0 * PI),
-        (1.0 - DIRECT_LIGHT_SAMPLING_PROBABILITY) / (4.0 * PI) + DIRECT_LIGHT_SAMPLING_PROBABILITY * raytraceResult.emissiveSamplingProbability / f32(emissiveFaces.count),
-        useDirectLightSampling
-    );
 
     if (raytraceResult.intersected) {
     	let voxelData = unpackVoxelData(voxelTypes[textureLoad(voxelsTexture, raytraceResult.voxel, 0).r]);
