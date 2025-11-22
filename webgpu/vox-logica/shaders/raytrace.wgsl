@@ -89,12 +89,13 @@ struct RaytraceResult
 {
     intersected: bool,
     voxel: vec3i,
+    voxelType: u32,
     point: vec3f,
     side: u32, // -X, +X, -Y, +Y, -Z, +Z
     emissiveSamplingProbability: f32,
 }
 
-const NO_INTERSECTION = RaytraceResult(false, vec3i(0), vec3f(0.0), 0u, 0.0);
+const NO_INTERSECTION = RaytraceResult(false, vec3i(0), 0u, vec3f(0.0), 0u, 0.0);
 
 const SIDE_NEIGHBOURS = array<vec3i, 6>(
     vec3i(-1,  0,  0),
@@ -114,79 +115,81 @@ const SIDE_NORMALS = array<vec3f, 6>(
     vec3f( 0.0,  0.0,  1.0),
 );
 
-fn raytraceScene(ray : Ray, voxelsTexture: texture_3d<u32>, computeEmissiveSamplingProbability: bool) -> RaytraceResult
+const CHUNK_SIZE = 4;
+
+fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>, chunks: texture_3d<u32>) -> RaytraceResult
 {
-    let mapSize = vec3i(textureDimensions(voxelsTexture));
+    let worldSizeInChunks = vec3i(textureDimensions(chunks));
 
-    let bbox = AABB(vec3f(0.0), vec3f(mapSize));
+    let worldBbox = AABB(vec3f(0.0), vec3f(worldSizeInChunks * CHUNK_SIZE));
 
-    var intersection = rayAABBIntersection(ray, bbox);
+    let rayOffsetOrigin = ray.origin - vec3f(worldOrigin * CHUNK_SIZE);
+
+    var intersection = rayAABBIntersection(Ray(rayOffsetOrigin, ray.direction), worldBbox);
 
     if (intersection.range.min > intersection.range.max || intersection.range.max < 0.0) {
         return NO_INTERSECTION;
     }
 
-    intersection.range.min = max(intersection.range.min, 0.0);
-
-    var position = ray.origin + ray.direction * intersection.range.min;
-    var cell = max(vec3i(0), min(vec3i(floor(position)), mapSize - vec3i(1)));
+    var position = rayOffsetOrigin + ray.direction * max(intersection.range.min, 0.0);
+    var chunk = max(vec3i(0), min(vec3i(floor(position / f32(CHUNK_SIZE))), worldSizeInChunks - vec3i(1)));
     var side = intersection.side;
-    var lastVoxelType = 0u;
-    var emissiveSamplingProbability = 0.0;
-
-    var result = NO_INTERSECTION;
 
     while (true)
     {
-        let voxelType = textureLoad(voxelsTexture, cell, 0).r;
-        if (voxelType != 0u && !result.intersected) {
-            result = RaytraceResult(true, cell, position, side, 0.0);
-            if (!computeEmissiveSamplingProbability) {
-                break;
-            }
-        }
+        let chunkData = textureLoad(chunks, chunk, 0);
+        if (chunkData.a != 0u) {
+            let chunkDataOffset = vec3i(chunkData.xyz) * CHUNK_SIZE;
+            var voxelLocal = max(vec3i(0), min(vec3i(CHUNK_SIZE - 1), vec3i(floor(position)) - chunk * CHUNK_SIZE));
+            while (true) {
+                let voxelData = textureLoad(chunksDataAtlas, chunkDataOffset + voxelLocal, 0).r;
+                if (voxelData != 0u) {
+                    return RaytraceResult(true, voxelLocal + (chunk + worldOrigin) * CHUNK_SIZE, voxelData, position + vec3f(worldOrigin * CHUNK_SIZE), side, 0.0);
+                }
 
-        if (computeEmissiveSamplingProbability) {
-            if (voxelType != 0u && lastVoxelType == 0u) {
-                let voxelData = unpackVoxelData(voxelTypes[voxelType]);
-                if (voxelData.mode == VOXEL_EMISSIVE) {
-                    let delta = position - ray.origin;
-                    emissiveSamplingProbability += dot(delta, delta) / max(1e-8, abs(dot(ray.direction, SIDE_NORMALS[side])));
+                let t = (select(vec3f(0.0), vec3f(f32(1.0)), ray.direction > vec3f(0.0)) + vec3f(voxelLocal + chunk * CHUNK_SIZE) - position) / ray.direction;
+
+                if (t.x < t.y && t.x < t.z) {
+                    position += ray.direction * t.x;
+                    voxelLocal.x += select(-1, 1, ray.direction.x > 0.0);
+                    side = select(0u, 1u, ray.direction.x < 0.0);
+                } else if (t.y < t.z) {
+                    position += ray.direction * t.y;
+                    voxelLocal.y += select(-1, 1, ray.direction.y > 0.0);
+                    side = select(2u, 3u, ray.direction.y < 0.0);
+                } else {
+                    position += ray.direction * t.z;
+                    voxelLocal.z += select(-1, 1, ray.direction.z > 0.0);
+                    side = select(4u, 5u, ray.direction.z < 0.0);
+                }
+
+                if (any(voxelLocal < vec3i(0)) || any(voxelLocal >= vec3i(CHUNK_SIZE))) {
+                    break;
                 }
             }
-
-            if (voxelType == 0u && lastVoxelType != 0u) {
-                let voxelData = unpackVoxelData(voxelTypes[lastVoxelType]);
-                if (voxelData.mode == VOXEL_EMISSIVE) {
-                    let delta = position - ray.origin;
-                    emissiveSamplingProbability += dot(delta, delta) / max(1e-8, abs(dot(ray.direction, SIDE_NORMALS[side])));
-                }
-            }
-        }
-
-        lastVoxelType = voxelType;
-
-        let t = (select(vec3f(0.0), vec3f(1.0), ray.direction > vec3f(0.0)) + vec3f(cell) - position) / ray.direction;
-
-        if (t.x < t.y && t.x < t.z) {
-            position += ray.direction * t.x;
-            cell.x += select(-1, 1, ray.direction.x > 0.0);
-            side = select(0u, 1u, ray.direction.x < 0.0);
-        } else if (t.y < t.z) {
-            position += ray.direction * t.y;
-            cell.y += select(-1, 1, ray.direction.y > 0.0);
-            side = select(2u, 3u, ray.direction.y < 0.0);
+            chunk += select((voxelLocal - vec3i(CHUNK_SIZE - 1)) / CHUNK_SIZE, voxelLocal / CHUNK_SIZE, voxelLocal >= vec3i(0));
         } else {
-            position += ray.direction * t.z;
-            cell.z += select(-1, 1, ray.direction.z > 0.0);
-            side = select(4u, 5u, ray.direction.z < 0.0);
+            let t = (select(vec3f(0.0), vec3f(f32(CHUNK_SIZE)), ray.direction > vec3f(0.0)) + vec3f(chunk * CHUNK_SIZE) - position) / ray.direction;
+
+            if (t.x < t.y && t.x < t.z) {
+                position += ray.direction * t.x;
+                chunk.x += select(-1, 1, ray.direction.x > 0.0);
+                side = select(0u, 1u, ray.direction.x < 0.0);
+            } else if (t.y < t.z) {
+                position += ray.direction * t.y;
+                chunk.y += select(-1, 1, ray.direction.y > 0.0);
+                side = select(2u, 3u, ray.direction.y < 0.0);
+            } else {
+                position += ray.direction * t.z;
+                chunk.z += select(-1, 1, ray.direction.z > 0.0);
+                side = select(4u, 5u, ray.direction.z < 0.0);
+            }
         }
 
-        if (any(cell < vec3i(0)) || any(cell >= vec3i(mapSize))) {
+        if (any(chunk < vec3i(0)) || any(chunk >= worldSizeInChunks)) {
             break;
         }
     }
 
-    result.emissiveSamplingProbability = emissiveSamplingProbability;
-    return result;
+    return NO_INTERSECTION;
 }

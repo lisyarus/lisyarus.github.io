@@ -11,7 +11,7 @@ var timestampQuerySupported;
 // Constants
 
 const hdrFormat = 'rgba16float';
-const renderUniformsBufferSize = 224;
+const renderUniformsBufferSize = 240;
 
 const diffuseProbeSize = 64;
 const diffuseProbesTableSize = 1048576;
@@ -19,12 +19,10 @@ const diffuseProbesTableSize = 1048576;
 const emissiveFaceSize = 16;
 const emissiveFacesTableSize = 1048576;
 
-const renderMode = 'probes';
+const renderMode = 'direct-raytrace';
 const integrateProbesIterations = 1;
 
 // Buffers
-
-var voxelTypesBuffer;
 
 var diffuseProbesCountBuffer;
 var diffuseProbesCountMapBuffer;
@@ -42,13 +40,6 @@ var performanceQuerySet;
 
 // Textures
 
-// TODO: replace with sparse wide (4x4x4) octree
-var voxelsTexture;
-var voxelsTextureView;
-var voxelProbeIndexBuffer;
-
-var emissiveFacesBuffer;
-
 var blueNoiseTexture;
 var blueNoiseTextureView;
 
@@ -56,9 +47,6 @@ var hdrTexture;
 var hdrTextureView;
 
 // Bind groups
-
-var voxelsBindGroupLayout;
-var voxelsBindGroup;
 
 var probesBindGroupLayout;
 var probesBindGroup;
@@ -131,6 +119,284 @@ function cameraProjectionMatrix(camera)
     // NB: near and far aren't really relevant, raytracing ignores them anyway
     // They do affect the precision of inverse camera matrix though
     return Matrix4.perspective(camera.xfov, camera.yfov, 10.0, 11.0);
+}
+
+// Chunk storage
+
+// Two-level tree chunk size benchmark results
+// Unoptimized two-level (inner+outer loop) DDA
+// Default camera view in the room scene, full HD
+//      | camera ray only | + 1 bounce ray |
+// -----+-----------------+----------------+
+//    4 |       5.6ms     |      27ms      |
+//    8 |       5.6ms     |      32ms      |
+//   16 |       7.2ms     |      46ms      |
+//   32 |      10.7ms     |      58ms      |
+//      +-----------------+----------------+
+
+const CHUNK_SIZE = 4;
+const CHUNK_ATLAS_SIZE = 512 / CHUNK_SIZE;
+
+class VoxelMap
+{
+    constructor()
+    {
+        this.voxelTypesBuffer = device.createBuffer({
+            label: "voxelTypes",
+            size: 4 * 256,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+        });
+
+        const voxelTypes = new Uint32Array(256);
+        // In 0xAABBGGRR format
+        // RGB is raw color (albedo / emission)
+        // A is 0 mode: 0 for diffuse, 1 for emissive
+        voxelTypes[0] = 0x00000000; // zero is always empty space, the value is meaningless
+        voxelTypes[1] = 0x00c0c0c0; // light-grey diffuse
+        voxelTypes[2] = 0x012060ff; // orange emissive
+        voxelTypes[3] = 0x01ff6020; // light-blue emissive
+        voxelTypes[4] = 0x0160ff20; // light-green emissive
+        voxelTypes[5] = 0x016020ff; // light-magenta emissive
+        voxelTypes[6] = 0x01ff2060; // light-magenta emissive
+        voxelTypes[7] = 0x0120ff60; // light-magenta emissive
+
+        device.queue.writeBuffer(this.voxelTypesBuffer, 0, voxelTypes);
+
+        const CHUNK_ATLAS_VOXEL_COUNT = CHUNK_SIZE * CHUNK_ATLAS_SIZE;
+        // Each CHUNK_SIZE^3 block is a separate chunk
+        this.chunksDataAtlasTexture = device.createTexture({
+            label: "chunksDataAtlas",
+            dimension: '3d',
+            format: 'r8uint',
+            size: [CHUNK_ATLAS_VOXEL_COUNT, CHUNK_ATLAS_VOXEL_COUNT, CHUNK_ATLAS_VOXEL_COUNT],
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+        });
+
+        this.freeChunks = [];
+        for (let z = CHUNK_ATLAS_SIZE - 1; z >= 0; z -= 1) {
+            for (let y = CHUNK_ATLAS_SIZE - 1; y >= 0; y -= 1) {
+                for (let x = CHUNK_ATLAS_SIZE - 1; x >= 0; x -= 1) {
+                    this.freeChunks.push([x, y, z]);
+                }
+            }
+        }
+
+        // In chunks
+        this.worldOrigin = [65535, 65535, 65535];
+        this.worldSize = [0, 0, 0];
+
+        this.chunksTexture = null;
+
+        this.voxelsBindGroupLayout = device.createBindGroupLayout({
+            entries: [
+                { // Voxel types buffer
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'read-only-storage',
+                    },
+                },
+                { // Chunks data atlas texture
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'uint',
+                        viewDimension: '3d',
+                    },
+                },
+                { // Chunks texture
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'uint',
+                        viewDimension: '3d',
+                    },
+                },
+            ],
+        });
+
+        this.voxelsBindGroup = null;
+    }
+
+    // voxels is a flat array
+    // origin & size are in voxels
+    initFrom(voxels, origin, size)
+    {
+        const newOrigin = [
+            Math.floor(origin[0] / CHUNK_SIZE),
+            Math.floor(origin[1] / CHUNK_SIZE),
+            Math.floor(origin[2] / CHUNK_SIZE),
+        ];
+
+        const newSize = [
+            Math.floor((origin[0] + size[0]) / CHUNK_SIZE - newOrigin[0]),
+            Math.floor((origin[1] + size[1]) / CHUNK_SIZE - newOrigin[1]),
+            Math.floor((origin[2] + size[2]) / CHUNK_SIZE - newOrigin[2]),
+        ];
+
+        this.resize(newOrigin, newSize);
+
+        let emptyChunks = 0;
+        let filledChunks = 0;
+
+        for (let cz = newOrigin[2]; cz < newOrigin[2] + newSize[2]; cz += 1) {
+            for (let cy = newOrigin[1]; cy < newOrigin[1] + newSize[1]; cy += 1) {
+                for (let cx = newOrigin[0]; cx < newOrigin[0] + newSize[0]; cx += 1) {
+                    const chunkData = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE);
+                    chunkData.fill(0);
+
+                    let chunkIsEmpty = true;
+
+                    for (let z = 0; z < CHUNK_SIZE; z += 1) {
+                        const dz = cz * CHUNK_SIZE + z - origin[2];
+                        if (dz < 0) continue;
+                        if (dz >= size[2]) continue;
+                        for (let y = 0; y < CHUNK_SIZE; y += 1) {
+                            const dy = cy * CHUNK_SIZE + y - origin[1];
+                            if (dy < 0) continue;
+                            if (dy >= size[1]) continue;
+                            for (let x = 0; x < CHUNK_SIZE; x += 1) {
+                                const dx = cx * CHUNK_SIZE + x - origin[0];
+                                if (dx < 0) continue;
+                                if (dx >= size[0]) continue;
+
+                                const srcIndex = dx + size[0] * (dy + size[2] * dz);
+                                const dstIndex = x + CHUNK_SIZE * (y + CHUNK_SIZE * z);
+                                chunkData[dstIndex] = voxels[srcIndex];
+
+                                if (chunkData[dstIndex] != 0)
+                                    chunkIsEmpty = false;
+                            }
+                        }
+                    }
+
+                    if (chunkIsEmpty) {
+                        emptyChunks += 1;
+                        continue;
+                    }
+
+                    filledChunks += 1;
+
+                    const chunkOffset = this.allocateChunk();
+                    device.queue.writeTexture(
+                        {origin: [cx - newOrigin[0], cy - newOrigin[1], cz - newOrigin[2]], texture: this.chunksTexture},
+                        new Uint8Array([chunkOffset[0], chunkOffset[1], chunkOffset[2], 255]),
+                        {bytesPerRow: 4, rowsPerImage: 1},
+                        [1, 1, 1]
+                    );
+
+                    // For some reason WebGPU doesn't upload full 3D array :/
+                    for (let z = 0; z < CHUNK_SIZE; z += 1)
+                        device.queue.writeTexture(
+                            {origin: [chunkOffset[0] * CHUNK_SIZE, chunkOffset[1] * CHUNK_SIZE, chunkOffset[2] * CHUNK_SIZE + z], texture: this.chunksDataAtlasTexture},
+                            chunkData,
+                            {offset: z * CHUNK_SIZE * CHUNK_SIZE, bytesPerRow: CHUNK_SIZE, rowsPerImage: CHUNK_SIZE},
+                            [CHUNK_SIZE, CHUNK_SIZE, 1]
+                        );
+                }
+            }
+        }
+
+        console.log(`Initialized map data, filled chunks: ${filledChunks}, empty chunks: ${emptyChunks}`);
+    }
+
+    allocateChunk()
+    {
+        if (this.freeChunks.length == 0) {
+            return null;
+        }
+
+        return this.freeChunks.pop();
+    }
+
+    resize(newOrigin, newSize)
+    {
+        const newChunksTexture = device.createTexture({
+            label: "chunks",
+            dimension: '3d',
+            format: 'rgba8uint',
+            size: newSize,
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+        });
+
+        for (let z = 0; z < newSize[2]; z += 1)
+            device.queue.writeTexture(
+                {origin: [0, 0, z], texture: newChunksTexture},
+                new Uint32Array(newSize[0] * newSize[1]).fill(0),
+                {bytesPerRow: newSize[0] * 4, rowsPerImage: newSize[1]},
+                [newSize[0], newSize[1], 1]
+            );
+
+        if (this.chunksTexture) {
+            const commandEncoder = device.createCommandEncoder({});
+            commandEncoder.copyTextureToTexture(
+                {texture: this.chunksTexture},
+                {origin: [this.worldOrigin[0] - newOrigin[0], this.worldOrigin[1] - newOrigin[1], this.worldOrigin[2] - newOrigin[2]], texture: newChunksTexture},
+                this.worldSize
+            );
+            const commandBuffer = commandEncoder.finish();
+            device.queue.submit([commandBuffer]);
+        }
+
+        this.chunksTexture = newChunksTexture;
+
+        this.worldOrigin = newOrigin;
+        this.worldSize = newSize;
+        this.voxelsBindGroup = null;
+    }
+
+    expand(voxelId)
+    {
+        const chunkId = [
+            Math.floor(voxelId[0] / CHUNK_SIZE),
+            Math.floor(voxelId[1] / CHUNK_SIZE),
+            Math.floor(voxelId[2] / CHUNK_SIZE),
+        ];
+
+        const newOrigin = [
+            Math.min(this.worldOrigin[0], chunkId[0]),
+            Math.min(this.worldOrigin[1], chunkId[1]),
+            Math.min(this.worldOrigin[2], chunkId[2]),
+        ];
+
+        const newSize = [
+            Math.max(this.worldSize[0], chunkId[0] - newOrigin[0]),
+            Math.max(this.worldSize[1], chunkId[1] - newOrigin[1]),
+            Math.max(this.worldSize[2], chunkId[2] - newOrigin[2]),
+        ];
+
+        if (newOrigin[0] == this.worldOrigin[0] && newOrigin[1] == this.worldOrigin[1] && newOrigin[2] == this.worldOrigin[2])
+            if (newSize[0] == this.worldSize[0] && newSize[1] == this.worldSize[1] && newSize[2] == this.worldSize[2])
+                return;
+
+        resize(newOrigin, newSize);
+    }
+
+    getBindGroup()
+    {
+        if (!this.voxelsBindGroup)
+        {
+            this.voxelsBindGroup = device.createBindGroup({
+                layout: this.voxelsBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: this.voxelTypesBuffer,
+                    },
+                    {
+                        binding: 1,
+                        resource: this.chunksDataAtlasTexture,
+                    },
+                    {
+                        binding: 2,
+                        resource: this.chunksTexture,
+                    },
+                ],
+            });
+        }
+
+        return this.voxelsBindGroup;
+    }
 }
 
 // Data loading functions
@@ -267,7 +533,7 @@ async function initWebGPU()
     timestampQuerySupported = adapter.features.has('timestamp-query');
     console.log("Timestamp query supported:", timestampQuerySupported);
 
-    var requiredFeatures = [];
+    var requiredFeatures = ['texture-formats-tier2'];
 
     if (timestampQuerySupported) {
         requiredFeatures.push('timestamp-query');
@@ -276,6 +542,7 @@ async function initWebGPU()
     device = await adapter?.requestDevice({
         requiredLimits: {
             // maxBufferSize: diffuseProbeSize * diffuseProbesTableSize,
+            maxBufferSize: 4294967296,
             // maxStorageBufferBindingSize: diffuseProbeSize * diffuseProbesTableSize,
         },
         requiredFeatures: requiredFeatures,
@@ -296,34 +563,8 @@ async function initWebGPU()
     console.log("Initialized WebGPU, surface format:", surfaceFormat);
 }
 
-function initVoxelTypes()
-{
-    voxelTypesBuffer = device.createBuffer({
-        label: "voxelTypes",
-        size: 4 * 256,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-
-    voxelTypes = new Uint32Array(256);
-    // In 0xAABBGGRR format
-    // RGB is raw color (albedo / emission)
-    // A is 0 mode: 0 for diffuse, 1 for emissive
-    voxelTypes[0] = 0x00000000; // zero is always empty space, the value is meaningless
-    voxelTypes[1] = 0x00c0c0c0; // light-grey diffuse
-    voxelTypes[2] = 0x012060ff; // orange emissive
-    voxelTypes[3] = 0x01ff6020; // light-blue emissive
-    voxelTypes[4] = 0x0160ff20; // light-green emissive
-    voxelTypes[5] = 0x016020ff; // light-magenta emissive
-    voxelTypes[6] = 0x01ff2060; // light-magenta emissive
-    voxelTypes[7] = 0x0120ff60; // light-magenta emissive
-
-    device.queue.writeBuffer(voxelTypesBuffer, 0, voxelTypes);
-}
-
 function initBuffers()
 {
-    initVoxelTypes();
-
     diffuseProbesCountBuffer = device.createBuffer({
         label: "diffuseProbesCount",
         size: 4,
@@ -394,74 +635,12 @@ function initQuerySets()
     }
 }
 
-function updateEmissiveSurfaces()
-{
-    var emissiveFaces = [0, 0, 0, 0];
-    for (var i = 0; i < map.length; i += 1) {
-        const x = ((i >>  0) & 255);
-        const y = ((i >>  8) & 255);
-        const z = ((i >> 16) & 255);
-
-        if ((voxelTypes[map[i]] & 0xff000000) != 0x01000000)
-            continue;
-
-        for (var j = 0; j < 6; j += 1) {
-            let nx = x + (j == 0 ? -1 : j == 1 ? 1 : 0);
-            let ny = y + (j == 2 ? -1 : j == 3 ? 1 : 0);
-            let nz = z + (j == 4 ? -1 : j == 5 ? 1 : 0);
-
-            if (nx < 0 || nx >= 256 || ny < 0 || ny >= 256 || nz < 0 || nz >= 256)
-                continue;
-
-            let index = nx + 256 * (ny + 256 * nz);
-
-            if (map[index] != 0)
-                continue;
-
-            emissiveFaces.push(x);
-            emissiveFaces.push(y);
-            emissiveFaces.push(z);
-            emissiveFaces.push(j);
-        }
-    }
-    emissiveFaces[0] = emissiveFaces.length / 4 - 1;
-    emissiveFacesCount = emissiveFaces[0];
-
-    device.queue.writeBuffer(emissiveFacesBuffer, 0, new Uint32Array(emissiveFaces));
-}
-
-function uploadMapSlice(z)
-{
-    device.queue.writeTexture(
-        { texture: voxelsTexture, origin: [0, 0, z] },
-        map,
-        { offset: 256 * 256 * z, bytesPerRow: 256, rowsPerImage: 256 },
-        { width: 256, height: 256 }
-    );
-}
-
 function initMap()
 {
-    voxelsTexture = device.createTexture({
-        label: "voxels",
-        dimension: '3d',
-        format: 'r8uint',
-        size: [256, 256, 256],
-        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
-    });
+    const voxels = new Uint8Array(256 * 256 * 256);
+    voxels.fill(0);
 
-    voxelsTextureView = voxelsTexture.createView({});
-
-    voxelProbeIndexBuffer = device.createBuffer({
-        label: "voxelsProbeIndex",
-        size: 256 * 256 * 256 * 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-
-    map = new Uint8Array(256 * 256 * 256);
-    map.fill(0);
-
-    for (var i = 0; i < map.length; i += 1) {
+    for (var i = 0; i < voxels.length; i += 1) {
         const x = ((i >>  0) & 255);
         const y = ((i >>  8) & 255);
         const z = ((i >> 16) & 255);
@@ -472,82 +651,57 @@ function initMap()
         const d = Math.max(Math.abs(dx), Math.abs(dy));
         
         if (z == 0) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
-            map[i] = 2;
+            voxels[i] = 2;
         }
 
         if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if (dx >= -4+32 && dx <= 3+32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if ((x == 0 || x == 255 || y == 0 || y == 255) && z <= 31 + 64) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if (d >= 63 && z == 31 + 64) {
-            map[i] = 1;
+            voxels[i] = 1;
         }
 
         if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
-            map[i] = 0;
+            voxels[i] = 0;
         }
     }
 
     if(false)
-    for (var i = 0; i < map.length; i += 1) {
+    for (var i = 0; i < voxels.length; i += 1) {
         const x = ((i >>  0) & 255);
         const y = ((i >>  8) & 255);
         const z = ((i >> 16) & 255);
 
         if (z == 1 && ((x % 16) == 7) && ((y % 16) == 7) && x < 128 && y < 128) {
-            map[i] = 2 + Math.min(5, Math.floor((Math.abs(579.14765 * Math.sin(152.43675 * i)) % 1) * 6));
+            voxels[i] = 2 + Math.min(5, Math.floor((Math.abs(579.14765 * Math.sin(152.43675 * i)) % 1) * 6));
             for (var dz = 0; dz < 4; dz += 1) {
-                map[i + 65536 * dz] = map[i];
-                map[i+1 + 65536 * dz] = map[i];
-                map[i+256 + 65536 * dz] = map[i];
-                map[i+257 + 65536 * dz] = map[i];
+                voxels[i + 65536 * dz] = voxels[i];
+                voxels[i+1 + 65536 * dz] = voxels[i];
+                voxels[i+256 + 65536 * dz] = voxels[i];
+                voxels[i+257 + 65536 * dz] = voxels[i];
             }
         }
     }
 
-
-    if (false) {
-        // For some reason this loads just the first layer :/
-        device.queue.writeTexture(
-            { texture: voxelsTexture },
-            map,
-            { bytesPerRow: 256, rowsPerImage: 256 },
-            { width: 256, height: 256, depthOrArraySlices: 256 }
-        );
-    }
-
-    for (var i = 0; i < 256; i += 1)
-        uploadMapSlice(i);
-
-    const voxelProbeIndexInit = new Uint32Array(256 * 256 * 256);
-    voxelProbeIndexInit.fill(0xffffffff);
-    device.queue.writeBuffer(voxelProbeIndexBuffer, 0, voxelProbeIndexInit);
-
-    emissiveFacesBuffer = device.createBuffer({
-        label: "emissiveFaces",
-        size: emissiveFaceSize * emissiveFacesTableSize,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    })
-
-    updateEmissiveSurfaces();
-
-    console.log("Loaded map");
+    map = new VoxelMap();
+    map.initFrom(voxels, [0, 0, 0], [256, 256, 256]);
 }
 
 async function initTextures()
@@ -558,62 +712,6 @@ async function initTextures()
 
 function initBindGroups()
 {
-    voxelsBindGroupLayout = device.createBindGroupLayout({
-        entries: [
-            { // Voxel types buffer
-                binding: 0,
-                visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'read-only-storage',
-                },
-            },
-            { // Voxels texture
-                binding: 1,
-                visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
-                texture: {
-                    sampleType: 'uint',
-                    viewDimension: '3d',
-                },
-            },
-            { // Voxels probe index texture
-                binding: 2,
-                visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
-                },
-            },
-            { // Emissive faces
-                binding: 3,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
-                },
-            },
-        ],
-    });
-
-    voxelsBindGroup = device.createBindGroup({
-        layout: voxelsBindGroupLayout,
-        entries: [
-            {
-                binding: 0,
-                resource: voxelTypesBuffer,
-            },
-            {
-                binding: 1,
-                resource: voxelsTextureView,
-            },
-            {
-                binding: 2,
-                resource: voxelProbeIndexBuffer,
-            },
-            {
-                binding: 3,
-                resource: emissiveFacesBuffer,
-            },
-        ],
-    });
-
     probesBindGroupLayout = device.createBindGroupLayout({
         entries: [
             { // Diffuse probes count
@@ -710,7 +808,7 @@ function initPipelines()
     renderDirectRaytracePipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({
             bindGroupLayouts: [
-                voxelsBindGroupLayout,
+                map.voxelsBindGroupLayout,
                 renderUniformsBindGroupLayout,
             ],
         }),
@@ -746,7 +844,7 @@ function initPipelines()
     renderProbesPipeline = device.createRenderPipeline({
         layout: device.createPipelineLayout({
             bindGroupLayouts: [
-                voxelsBindGroupLayout,
+                map.voxelsBindGroupLayout,
                 probesBindGroupLayout,
                 renderUniformsBindGroupLayout,
             ],
@@ -772,7 +870,7 @@ function initPipelines()
     diffuseProbesIntegratePipeline = device.createComputePipeline({
         layout: device.createPipelineLayout({
             bindGroupLayouts: [
-                voxelsBindGroupLayout,
+                map.voxelsBindGroupLayout,
                 probesBindGroupLayout,
                 renderUniformsBindGroupLayout,
             ],
@@ -921,7 +1019,7 @@ function redraw()
     const renderUniforms = new ArrayBuffer(renderUniformsBufferSize);
     {
         const renderUniformsFloat = new Float32Array(renderUniforms);
-        const renderUniformsUint = new Uint32Array(renderUniforms);
+        const renderUniformsInt = new Int32Array(renderUniforms);
 
         const viewProjectionMatrix = cameraProjectionMatrix(camera).mult(cameraViewMatrix(camera)).transpose();
         const viewProjectionInverseMatrix = viewProjectionMatrix.inverse();
@@ -933,15 +1031,18 @@ function redraw()
             renderUniformsFloat[i + 32] = lastFrameViewProjectionMatrix.values[i];
         for (var i = 0; i < 3; i += 1)
             renderUniformsFloat[i + 48] = camera.position[i];
-        renderUniformsUint[51] = frameID;
+        renderUniformsInt[51] = frameID;
 
-        // const skyColor = [0.01, 0.02, 0.04, 1.0];
-        // const skyColor = [0.1, 0.2, 0.3, 1.0];
-        const skyColor = [0.4, 0.7, 1.0, 1.0];
-        // const skyColor = [1.0, 1.0, 1.0, 1.0];
-        // const skyColor = [0.0, 0.0, 0.0, 1.0];
-        for (var i = 0; i < 4; i += 1)
+        // const skyColor = [0.01, 0.02, 0.04];
+        // const skyColor = [0.1, 0.2, 0.3];
+        const skyColor = [0.4, 0.7, 1.0];
+        // const skyColor = [1.0, 1.0, 1.0];
+        // const skyColor = [0.0, 0.0, 0.0];
+        for (var i = 0; i < 3; i += 1)
             renderUniformsFloat[i + 52] = skyColor[i];
+
+        for (var i = 0; i < 3; i += 1)
+            renderUniformsInt[i + 56] = map.worldOrigin[i];
     }
 
     device.queue.writeBuffer(renderUniformsBuffer, 0, renderUniforms);
@@ -964,7 +1065,7 @@ function redraw()
                 endOfPassWriteIndex: 3,
             }},
         });
-        mainPass.setBindGroup(0, voxelsBindGroup);
+        mainPass.setBindGroup(0, map.getBindGroup());
         mainPass.setBindGroup(1, renderUniformsBindGroup);
         mainPass.setPipeline(renderDirectRaytracePipeline);
         mainPass.draw(3);
@@ -984,7 +1085,7 @@ function redraw()
                     endOfPassWriteIndex: 1,
                 }},
             });
-            integrateProbesPass.setBindGroup(0, voxelsBindGroup);
+            integrateProbesPass.setBindGroup(0, map.getBindGroup());
             integrateProbesPass.setBindGroup(1, probesBindGroup);
             integrateProbesPass.setBindGroup(2, renderUniformsBindGroup);
             integrateProbesPass.setPipeline(diffuseProbesIntegratePipeline);
@@ -1007,7 +1108,7 @@ function redraw()
                 endOfPassWriteIndex: 3,
             }},
         });
-        mainPass.setBindGroup(0, voxelsBindGroup);
+        mainPass.setBindGroup(0, map.getBindGroup());
         mainPass.setBindGroup(1, probesBindGroup);
         mainPass.setBindGroup(2, renderUniformsBindGroup);
         mainPass.setPipeline(renderProbesPipeline);
