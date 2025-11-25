@@ -93,9 +93,10 @@ struct RaytraceResult
     point: vec3f,
     side: u32, // -X, +X, -Y, +Y, -Z, +Z
     emissiveSamplingProbability: f32,
+    steps: u32,
 }
 
-const NO_INTERSECTION = RaytraceResult(false, vec3i(0), 0u, vec3f(0.0), 0u, 0.0);
+const NO_INTERSECTION = RaytraceResult(false, vec3i(0), 0u, vec3f(0.0), 0u, 0.0, 0u);
 
 const SIDE_NEIGHBOURS = array<vec3i, 6>(
     vec3i(-1,  0,  0),
@@ -115,7 +116,24 @@ const SIDE_NORMALS = array<vec3f, 6>(
     vec3f( 0.0,  0.0,  1.0),
 );
 
-const CHUNK_SIZE = 4;
+const CHUNK_SIZE = 64;
+const NOISE_THRESHOLD = 1.0;
+
+fn dotNoise(p: vec3f) -> f32
+{
+    const PHI = 1.618033988;
+
+    const GOLD = transpose(mat3x3f(
+        vec3f(-0.571464913,  0.814921382,  0.096597072),
+        vec3f(-0.278044873, -0.303026659,  0.911518454),
+        vec3f( 0.772087367,  0.494042493,  0.399753815)
+    ));
+
+    let X = GOLD * p;
+    let Y = p * GOLD;
+
+    return dot(cos(X), sin(PHI * Y)) / 3.0;
+}
 
 fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>, chunks: texture_3d<u32>) -> RaytraceResult
 {
@@ -134,6 +152,7 @@ fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>
     var position = rayOffsetOrigin + ray.direction * max(intersection.range.min, 0.0);
     var chunk = max(vec3i(0), min(vec3i(floor(position / f32(CHUNK_SIZE))), worldSizeInChunks - vec3i(1)));
     var side = intersection.side;
+    var steps = 0u;
 
     while (true)
     {
@@ -143,8 +162,9 @@ fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>
             var voxelLocal = max(vec3i(0), min(vec3i(CHUNK_SIZE - 1), vec3i(floor(position)) - chunk * CHUNK_SIZE));
             while (true) {
                 let voxelData = textureLoad(chunksDataAtlas, chunkDataOffset + voxelLocal, 0).r;
+                //let voxelData = select(0u, 1u, dotNoise(vec3f(voxelLocal + (chunk + worldOrigin) * CHUNK_SIZE) * 0.1) > NOISE_THRESHOLD);
                 if (voxelData != 0u) {
-                    return RaytraceResult(true, voxelLocal + (chunk + worldOrigin) * CHUNK_SIZE, voxelData, position + vec3f(worldOrigin * CHUNK_SIZE), side, 0.0);
+                    return RaytraceResult(true, voxelLocal + (chunk + worldOrigin) * CHUNK_SIZE, voxelData, position + vec3f(worldOrigin * CHUNK_SIZE), side, 0.0, steps);
                 }
 
                 let t = (select(vec3f(0.0), vec3f(f32(1.0)), ray.direction > vec3f(0.0)) + vec3f(voxelLocal + chunk * CHUNK_SIZE) - position) / ray.direction;
@@ -162,6 +182,8 @@ fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>
                     voxelLocal.z += select(-1, 1, ray.direction.z > 0.0);
                     side = select(4u, 5u, ray.direction.z < 0.0);
                 }
+
+                steps += 1u;
 
                 if (any(voxelLocal < vec3i(0)) || any(voxelLocal >= vec3i(CHUNK_SIZE))) {
                     break;
@@ -184,6 +206,8 @@ fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>
                 chunk.z += select(-1, 1, ray.direction.z > 0.0);
                 side = select(4u, 5u, ray.direction.z < 0.0);
             }
+
+            steps += 1u;
         }
 
         if (any(chunk < vec3i(0)) || any(chunk >= worldSizeInChunks)) {
@@ -191,5 +215,67 @@ fn raytraceScene(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>
         }
     }
 
+    return RaytraceResult(false, vec3i(0), 0u, vec3f(0.0), 0u, 0.0, steps);
+    return NO_INTERSECTION;
+}
+
+// FAKE
+fn raytraceSceneFake(ray : Ray, worldOrigin: vec3i, chunksDataAtlas: texture_3d<u32>, chunks: texture_3d<u32>) -> RaytraceResult
+{
+    let worldSizeInChunks = vec3i(textureDimensions(chunks));
+
+    let worldBbox = AABB(vec3f(0.0), vec3f(worldSizeInChunks * CHUNK_SIZE));
+
+    let rayOffsetOrigin = ray.origin - vec3f(worldOrigin * CHUNK_SIZE);
+
+    var intersection = rayAABBIntersection(Ray(rayOffsetOrigin, ray.direction), worldBbox);
+
+    if (intersection.range.min > intersection.range.max || intersection.range.max < 0.0) {
+        return NO_INTERSECTION;
+    }
+
+    var position = rayOffsetOrigin + ray.direction * max(intersection.range.min, 0.0);
+    var chunk = max(vec3i(0), min(vec3i(floor(position / f32(CHUNK_SIZE))), worldSizeInChunks - vec3i(1)));
+    var side = intersection.side;
+    var steps = 0u;
+
+    while (true)
+    {
+        let chunkData = textureLoad(chunks, chunk, 0);
+        if (chunkData.a != 0u) {
+            let chunkDataOffset = vec3i(chunkData.xyz) * CHUNK_SIZE;
+            var voxelLocal = max(vec3i(0), min(vec3i(CHUNK_SIZE - 1), vec3i(floor(position)) - chunk * CHUNK_SIZE));
+            while (true) {
+                let voxelData = textureLoad(chunksDataAtlas, chunkDataOffset + voxelLocal, 0).r;
+                if (voxelData != 0u) {
+                    return RaytraceResult(true, voxelLocal + (chunk + worldOrigin) * CHUNK_SIZE, voxelData, position + vec3f(worldOrigin * CHUNK_SIZE), side, 0.0, steps);
+                }
+
+                position.y += 1.0;
+                voxelLocal.y += 1;
+                side = 2u;
+
+                steps += 1u;
+
+                if (any(voxelLocal < vec3i(0)) || any(voxelLocal >= vec3i(CHUNK_SIZE))) {
+                    break;
+                }
+            }
+            chunk += select((voxelLocal - vec3i(CHUNK_SIZE - 1)) / CHUNK_SIZE, voxelLocal / CHUNK_SIZE, voxelLocal >= vec3i(0));
+        } else {
+            
+            position.y += f32(CHUNK_SIZE);
+            chunk.y += 1;
+            side = 2u;
+
+            steps += 1u;
+        }
+
+        if (any(chunk < vec3i(0)) || any(chunk >= worldSizeInChunks)) {
+            break;
+        }
+    }
+
+    return RaytraceResult(false, vec3i(0), 0u, vec3f(0.0), 0u, 0.0, steps);
     return NO_INTERSECTION;
 }

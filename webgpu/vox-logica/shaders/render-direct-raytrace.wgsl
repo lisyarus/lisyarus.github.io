@@ -24,7 +24,7 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
     var accumulated = vec3f(0.0);
     var factor = vec3f(1.0);
 
-    for (var bounce = 0u; bounce < 2u; bounce += 1u) {
+    for (var bounce = 0u; bounce < 1u; bounce += 1u) {
         let result = raytraceScene(ray, uniforms.worldOrigin, chunksDataAtlas, chunks);
         if (!result.intersected) {
             accumulated += factor * uniforms.skyColor;
@@ -38,10 +38,12 @@ fn fragmentMain(in : VertexOut) -> @location(0) vec4f
         let normal = SIDE_NORMALS[result.side];
         //accumulated = pow(normal * 0.5 + vec3f(0.5), vec3f(2.2));
         //accumulated = vec3f(result.voxel) / 16.0;
+        accumulated = pow(vec3f(0.5 + 0.5 * dot(normal, normalize(vec3f(1.0, 4.0, 7.0)))), vec3f(2.2));
+        //accumulated = mix(vec3f(select(0.0, 0.2, result.intersected), 0.0, select(0.0, 1.0, result.intersected)), vec3f(1.0, 0.25, 0.0), f32(result.steps) / 256.0);
 
         let newDirection = randomCosineHemisphere(&randomGenerator, normal);
         ray = Ray(result.point + newDirection * 0.01, newDirection);
     }
 
-    return vec4f(accumulated, 1.0 / 16.0);
+    return vec4f(accumulated, 1.0 / 1.0);
 }

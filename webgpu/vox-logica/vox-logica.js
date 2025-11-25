@@ -98,8 +98,8 @@ var emissiveFacesCount = 0;
 // Camera
 
 var camera = {
-    position: [32, 4, 48],
-    xangle: - Math.PI * 0.2,
+    position: [128, -64, 128],
+    xangle: 0,
     yangle: 0,
     xfov: Math.PI / 2,
     yfov: Math.PI / 2,
@@ -134,8 +134,16 @@ function cameraProjectionMatrix(camera)
 //   32 |      10.7ms     |      58ms      |
 //      +-----------------+----------------+
 
-const CHUNK_SIZE = 4;
+// Two-level tree benchmark results
+// Unoptimized two-level (inner+outer loop) DDA
+// Dafault camera view in dot-noise scene, full HD
+//
+
+
+
+const CHUNK_SIZE = 64;
 const CHUNK_ATLAS_SIZE = 512 / CHUNK_SIZE;
+const NOISE_THRESHOLD = 0.5;
 
 class VoxelMap
 {
@@ -635,6 +643,35 @@ function initQuerySets()
     }
 }
 
+function noise(p)
+{
+    const PHI = 1.618033988;
+
+    const GOLD = [
+        [-0.571464913, +0.814921382, +0.096597072],
+        [-0.278044873, -0.303026659, +0.911518454],
+        [+0.772087367, +0.494042493, +0.399753815],
+    ]
+
+    const X = [
+        GOLD[0][0] * p[0] + GOLD[0][1] * p[1] + GOLD[0][2] * p[2],
+        GOLD[1][0] * p[0] + GOLD[1][1] * p[1] + GOLD[1][2] * p[2],
+        GOLD[2][0] * p[0] + GOLD[2][1] * p[1] + GOLD[2][2] * p[2],
+    ];
+
+    const Y = [
+        GOLD[0][0] * p[0] + GOLD[1][0] * p[1] + GOLD[2][0] * p[2],
+        GOLD[0][1] * p[0] + GOLD[1][1] * p[1] + GOLD[2][1] * p[2],
+        GOLD[0][2] * p[0] + GOLD[1][2] * p[1] + GOLD[2][2] * p[2],
+    ];
+
+    return (1/3) * (0
+        + Math.cos(X[0]) * Math.sin(PHI * Y[0])
+        + Math.cos(X[1]) * Math.sin(PHI * Y[1])
+        + Math.cos(X[2]) * Math.sin(PHI * Y[2])
+        );
+}
+
 function initMap()
 {
     const voxels = new Uint8Array(256 * 256 * 256);
@@ -650,37 +687,43 @@ function initMap()
         const dz = z - 64;
         const d = Math.max(Math.abs(dx), Math.abs(dy));
         
-        if (z == 0) {
+        // if (z == 0) {
+        //     voxels[i] = 1;
+        // }
+
+        // if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
+        //     voxels[i] = 2;
+        // }
+
+        // if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
+        //     voxels[i] = 1;
+        // }
+
+        // if (dx >= -4+32 && dx <= 3+32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
+        //     voxels[i] = 1;
+        // }
+
+        // if ((x == 0 || x == 255 || y == 0 || y == 255) && z <= 31 + 64) {
+        //     voxels[i] = 1;
+        // }
+
+        // if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
+        //     voxels[i] = 1;
+        // }
+
+        // if (d >= 63 && z == 31 + 64) {
+        //     voxels[i] = 1;
+        // }
+
+        // if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
+        //     voxels[i] = 0;
+        // }
+
+        //const r = Math.sqrt(Math.pow(x - 128, 2) + Math.pow(y - 128, 2) + Math.pow(z - 128, 2)) / 128;
+        const n = noise([x * 0.1, y * 0.1, z * 0.1]);
+
+        if (n > NOISE_THRESHOLD)
             voxels[i] = 1;
-        }
-
-        if (dx >= -4 && dx <= 3 && dy >= -4 && dy <= 3 && z <= 31 + 48) {
-            voxels[i] = 2;
-        }
-
-        if (dx >= -4-32 && dx <= 3-32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            voxels[i] = 1;
-        }
-
-        if (dx >= -4+32 && dx <= 3+32 && dy >= -8 && dy <= 7 && z <= 31 + 48) {
-            voxels[i] = 1;
-        }
-
-        if ((x == 0 || x == 255 || y == 0 || y == 255) && z <= 31 + 64) {
-            voxels[i] = 1;
-        }
-
-        if (d == 64 && Math.abs(dx) == 64 && z <= 31 + 64) {
-            voxels[i] = 1;
-        }
-
-        if (d >= 63 && z == 31 + 64) {
-            voxels[i] = 1;
-        }
-
-        if ((x == 0 || x == 255) && Math.abs(dy) < 16 && Math.abs(dz) < 16) {
-            voxels[i] = 0;
-        }
     }
 
     if(false)
