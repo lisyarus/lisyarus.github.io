@@ -1,0 +1,3569 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Polyhedria">
+<meta property="og:site_name" content="lisyarus blog">
+<meta property="og:image" content="/webgl/polyhedria/cover.png" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:width" content="1200" />
+<title>Polyhedria</title>
+<link rel="icon" type="image/x-icon" href="/blog/assets/favicon.ico">
+<script id="primitives" type="model/obj">
+# Blender 4.4.3
+# www.blender.org
+o Square_antiprism
+v 8.707107 -4.000000 -0.000643
+v 8.000000 -3.292893 -0.000643
+v 7.292893 -4.000000 -0.000643
+v 8.000000 -4.707107 -0.000643
+v 7.500000 -4.500000 0.840253
+v 7.500000 -3.500000 0.840253
+v 8.500000 -3.500000 0.840253
+v 8.500000 -4.500000 0.840253
+s 0
+f 2 1 4 3
+f 6 5 8 7
+f 4 1 8
+f 8 5 4
+f 4 5 3
+f 5 6 3
+f 3 6 2
+f 6 7 2
+f 2 7 1
+f 7 8 1
+o Cube
+v 5.500000 -3.500000 0.000000
+v 5.500000 -3.500000 1.000000
+v 6.500000 -3.500000 0.000000
+v 6.500000 -3.500000 1.000000
+v 5.500000 -4.500000 0.000000
+v 5.500000 -4.500000 1.000000
+v 6.500000 -4.500000 0.000000
+v 6.500000 -4.500000 1.000000
+s 0
+f 9 10 12 11
+f 11 12 16 15
+f 15 16 14 13
+f 13 14 10 9
+f 11 15 13 9
+f 16 12 10 14
+o Tetrahedron
+v -0.000000 -4.000000 0.818169
+v -0.500000 -4.288675 0.001672
+v 0.000000 -3.422650 0.001672
+v 0.500000 -4.288675 0.001672
+s 0
+f 18 19 20
+f 18 20 17
+f 17 19 18
+f 19 17 20
+o Triangular_prism
+v 3.500000 -4.288675 0.005524
+v 4.000000 -3.422650 0.005524
+v 4.500000 -4.288675 0.005524
+v 3.500000 -4.288675 1.005524
+v 4.000000 -3.422650 1.005524
+v 4.500000 -4.288675 1.005524
+s 0
+f 21 22 23
+f 24 26 25
+f 21 24 25 22
+f 22 25 26 23
+f 23 26 24 21
+o Icosahedron
+v 10.000000 -4.000000 0.005044
+v 9.500010 -4.688185 0.530774
+v 9.190993 -3.737142 0.530774
+v 10.000000 -3.149351 0.530774
+v 10.809007 -3.737142 0.530774
+v 10.499990 -4.688185 0.530774
+v 9.190993 -4.262858 1.381427
+v 9.500010 -3.311816 1.381427
+v 10.499990 -3.311816 1.381427
+v 10.809007 -4.262858 1.381427
+v 10.000000 -4.850649 1.381427
+v 10.000000 -4.000000 1.907157
+s 0
+f 27 28 29
+f 28 27 32
+f 27 29 30
+f 27 30 31
+f 27 31 32
+f 28 32 37
+f 29 28 33
+f 30 29 34
+f 31 30 35
+f 32 31 36
+f 28 37 33
+f 29 33 34
+f 30 34 35
+f 31 35 36
+f 32 36 37
+f 33 37 38
+f 34 33 38
+f 35 34 38
+f 36 35 38
+f 37 36 38
+o Hexagonal_prism
+v 12.866025 -3.500000 1.000000
+v 12.000000 -3.000000 1.000000
+v 11.133975 -3.500000 1.000000
+v 11.133975 -4.500000 1.000000
+v 12.000000 -5.000000 1.000000
+v 12.866025 -4.500000 1.000000
+v 12.866025 -3.500000 0.000000
+v 12.000000 -3.000000 0.000000
+v 11.133975 -3.500000 0.000000
+v 11.133975 -4.500000 0.000000
+v 12.000000 -5.000000 0.000000
+v 12.866025 -4.500000 0.000000
+s 0
+f 39 44 50 45
+f 43 42 48 49
+f 41 40 46 47
+f 44 43 49 50
+f 42 41 47 48
+f 40 39 45 46
+f 40 41 42 43 44 39
+f 46 45 50 49 48 47
+o Truncated_tetrahedron
+v 17.133976 -3.500001 0.000000
+v 17.133976 -4.500001 0.000000
+v 18.000002 -5.000001 0.000000
+v 17.422634 -3.000001 0.816503
+v 17.422634 -5.000001 0.816503
+v 17.711290 -4.500001 1.633005
+v 18.000002 -3.000001 0.000000
+v 17.711344 -3.499971 1.633005
+v 18.577370 -3.999971 1.633005
+v 18.866026 -3.500001 -0.000000
+v 18.866026 -4.500001 0.000000
+v 19.154711 -4.000016 0.816503
+s 0
+f 51 57 60 61 53 52
+f 51 52 55 56 58 54
+f 54 58 59 62 60 57
+f 53 61 62 59 56 55
+f 62 61 60
+f 57 51 54
+f 52 53 55
+f 59 58 56
+o Truncated_octahedron
+v 8.292893 0.000000 0.000000
+v 9.000000 0.707107 0.000000
+v 10.414175 0.000039 2.121435
+v 10.414137 0.707030 1.414290
+v 9.707030 1.414137 1.414290
+v 8.999962 1.414175 2.121435
+v 9.000000 -0.707106 0.000000
+v 9.000000 0.707107 2.828580
+v 9.707107 0.000000 0.000000
+v 10.414175 -0.000038 0.707145
+v 8.292971 1.414137 1.414290
+v 7.585864 0.707030 1.414290
+v 8.292894 0.000000 2.828580
+v 9.000039 1.414175 0.707145
+v 9.707107 0.000000 2.828580
+v 9.000039 -1.414174 0.707145
+v 9.000001 -0.707106 2.828580
+v 7.585825 0.000039 0.707145
+v 7.585864 -0.707030 1.414290
+v 8.292971 -1.414136 1.414290
+v 10.414137 -0.707030 1.414290
+v 9.707030 -1.414136 1.414290
+v 7.585826 0.000039 2.121435
+v 9.000039 -1.414175 2.121435
+s 0
+f 63 64 71 69
+f 71 72 83 84 78 69
+f 64 76 67 66 72 71
+f 63 80 74 73 76 64
+f 69 78 82 81 80 63
+f 79 77 70 75
+f 70 68 73 74 85 75
+f 77 65 66 67 68 70
+f 79 86 84 83 65 77
+f 75 85 81 82 86 79
+f 67 76 73 68
+f 74 80 81 85
+f 82 78 84 86
+f 83 72 66 65
+o Truncated_cube
+v 10.792893 0.500000 0.207183
+v 10.792893 1.207107 0.914290
+v 11.500000 1.207107 0.207183
+v 10.792893 0.500000 2.621397
+v 11.500000 1.207107 2.621397
+v 10.792893 1.207107 1.914290
+v 12.500000 1.207107 0.207183
+v 13.207107 1.207107 0.914290
+v 13.207107 0.500000 0.207183
+v 13.207107 0.500000 2.621397
+v 13.207107 1.207107 1.914290
+v 12.500000 1.207107 2.621397
+v 11.500000 -1.207107 0.207183
+v 10.792893 -1.207107 0.914290
+v 10.792893 -0.500000 0.207183
+v 10.792893 -0.500000 2.621397
+v 10.792893 -1.207107 1.914290
+v 11.500000 -1.207107 2.621397
+v 13.207107 -0.500000 0.207183
+v 13.207107 -1.207107 0.914290
+v 12.500000 -1.207107 0.207183
+v 12.500000 -1.207107 2.621397
+v 13.207107 -1.207107 1.914290
+v 13.207107 -0.500000 2.621397
+s 0
+f 101 100 103 102 90 92 88 87
+f 107 106 109 108 104 103 100 99
+f 108 110 96 98 91 90 102 104
+f 89 88 92 91 98 97 94 93
+f 95 94 97 96 110 109 106 105
+f 87 88 89
+f 90 91 92
+f 93 94 95
+f 96 97 98
+f 99 100 101
+f 102 103 104
+f 105 106 107
+f 108 109 110
+f 93 95 105 107 99 101 87 89
+o Truncated_cuboctahedron
+v 17.207108 0.500000 0.000000
+v 16.500000 1.207107 0.000000
+v 17.914213 -1.207107 1.414213
+v 17.914213 0.500000 3.121320
+v 17.914213 -0.500000 3.121320
+v 15.500000 -1.207107 0.000000
+v 17.914213 1.207107 2.414213
+v 17.207108 -0.500000 0.000000
+v 15.500000 1.914213 3.121320
+v 17.914213 -0.500000 0.707107
+v 15.500000 1.207107 0.000000
+v 17.207108 1.914213 1.414213
+v 15.500000 1.914213 0.707107
+v 16.500000 1.207107 3.828426
+v 14.792893 -0.500000 0.000000
+v 14.792893 0.500000 0.000000
+v 14.085787 -0.500000 0.707107
+v 14.085787 -0.500000 3.121319
+v 16.500000 -1.207107 0.000000
+v 17.914213 -1.207107 2.414213
+v 16.500000 -1.914213 0.707107
+v 14.792893 -0.500000 3.828426
+v 17.914213 1.207107 1.414213
+v 17.914213 0.500000 0.707107
+v 14.792893 1.914213 2.414213
+v 16.500000 1.914213 0.707107
+v 17.207108 1.914213 2.414213
+v 14.792893 1.914213 1.414213
+v 16.500000 -1.207107 3.828426
+v 14.085787 1.207106 1.414213
+v 14.085787 0.500000 3.121320
+v 14.085787 -1.207107 2.414213
+v 14.085787 0.500000 0.707107
+v 14.085787 1.207106 2.414213
+v 14.085787 -1.207107 1.414213
+v 15.500000 1.207107 3.828426
+v 14.792893 -1.914213 1.414213
+v 15.500000 -1.914213 3.121319
+v 17.207108 -1.914213 2.414213
+v 15.500001 -1.914214 0.707107
+v 14.792893 -1.914213 2.414213
+v 17.207108 -1.914213 1.414213
+v 14.792893 0.500000 3.828426
+v 16.500000 1.914213 3.121320
+v 17.207106 -0.500000 3.828426
+v 17.207106 0.500000 3.828426
+v 15.500000 -1.207107 3.828426
+v 16.500000 -1.914214 3.121320
+s 0
+f 112 111 118 129 116 125 126 121
+f 111 134 120 118
+f 121 123 136 112
+f 125 127 143 126
+f 129 131 150 116
+f 133 117 114 115 130 113 120 134
+f 138 135 119 154 137 122 136 123
+f 145 142 128 141 144 140 143 127
+f 152 149 158 148 151 147 150 131
+f 146 153 132 157 139 155 156 124
+f 153 141 128 132
+f 124 154 119 146
+f 155 115 114 156
+f 157 148 158 139
+f 113 130 149 152
+f 122 137 117 133
+f 135 138 140 144
+f 142 145 147 151
+f 130 115 155 139 158 149
+f 132 128 142 151 148 157
+f 119 135 144 141 153 146
+f 114 117 137 154 124 156
+f 118 120 113 152 131 129
+f 127 125 116 150 147 145
+f 123 121 126 143 140 138
+f 111 112 136 122 133 134
+o Octagonal_prism
+v -1.207107 0.500000 0.005596
+v -0.500000 1.207107 0.005596
+v 0.500000 1.207107 0.005596
+v 1.207107 0.500000 1.005596
+v 1.207107 0.500000 0.005596
+v 0.500000 1.207107 1.005596
+v -0.500000 -1.207107 0.005596
+v -0.500000 1.207107 1.005596
+v -1.207107 -0.500000 0.005596
+v 0.500000 -1.207107 1.005596
+v 1.207107 -0.500000 0.005596
+v -1.207107 0.500000 1.005596
+v 0.500000 -1.207107 0.005596
+v 1.207107 -0.500000 1.005596
+v -1.207107 -0.500000 1.005596
+v -0.500000 -1.207107 1.005596
+s 0
+f 161 164 162 163
+f 169 172 168 171
+f 160 166 164 161
+f 163 162 172 169
+f 159 170 166 160
+f 167 173 170 159
+f 171 168 174 165
+f 164 166 170 173 174 168 172 162
+f 165 174 173 167
+f 161 163 169 171 165 167 159 160
+o Octagonal_antiprism
+v 1.792893 0.500000 0.000000
+v 4.207107 0.500000 0.000000
+v 1.792893 -0.500000 0.000000
+v 3.500000 -1.207107 0.000000
+v 3.000000 -1.306563 0.860296
+v 3.923879 -0.923879 0.860296
+v 4.207107 -0.500000 0.000000
+v 4.306563 0.000000 0.860296
+v 3.500000 1.207107 0.000000
+v 3.923879 0.923879 0.860296
+v 2.500000 1.207107 0.000000
+v 3.000000 1.306563 0.860296
+v 2.076121 0.923879 0.860296
+v 1.693437 0.000000 0.860296
+v 2.500000 -1.207107 0.000000
+v 2.076121 -0.923879 0.860296
+s 0
+f 189 178 179
+f 183 176 181 178 189 177 175 185
+f 178 181 180
+f 181 176 182
+f 176 183 184
+f 183 185 186
+f 185 175 187
+f 175 177 188
+f 177 189 190
+f 188 187 175
+f 190 188 177
+f 179 190 189
+f 179 178 180
+f 181 182 180
+f 184 182 176
+f 183 186 184
+f 185 187 186
+f 186 187 188 190 179 180 182 184
+o Hexagonal_antiprism
+v 13.000000 -4.000000 0.000000
+v 14.000000 -3.000000 0.855600
+v 13.500000 -3.133975 0.000000
+v 13.133974 -3.500000 0.855600
+v 13.500000 -4.866025 0.000000
+v 13.133974 -4.500000 0.855600
+v 14.000000 -5.000000 0.855600
+v 14.500000 -4.866025 0.000000
+v 14.866026 -4.500000 0.855600
+v 15.000000 -4.000000 0.000000
+v 14.500000 -3.133975 0.000000
+v 14.866026 -3.500000 0.855600
+s 0
+f 201 200 198 195 191 193
+f 201 193 192
+f 193 191 194
+f 191 195 196
+f 195 198 197
+f 198 200 199
+f 200 201 202
+f 192 202 201
+f 194 192 193
+f 191 196 194
+f 195 197 196
+f 198 199 197
+f 200 202 199
+f 194 196 197 199 202 192
+o Square_pyramid
+v 2.000000 -7.707107 0.001063
+v 2.000000 -7.000000 0.708169
+v 1.292893 -7.000000 0.001063
+v 2.000000 -6.292893 0.001063
+v 2.707107 -7.000000 0.001063
+s 0
+f 204 203 207
+f 205 206 207 203
+f 204 205 203
+f 204 206 205
+f 206 204 207
+o Square_cupola
+v 9.500000 -8.207107 -0.002989
+v 8.500000 -8.207107 -0.002989
+v 10.207107 -7.500000 -0.002989
+v 10.207107 -6.500000 -0.002989
+v 9.500000 -7.500000 0.704118
+v 7.792893 -7.500000 -0.002989
+v 8.500000 -7.500000 0.704118
+v 8.500000 -6.500000 0.704118
+v 9.500000 -5.792893 -0.002989
+v 8.500000 -5.792893 -0.002989
+v 9.500000 -6.500000 0.704118
+v 7.792893 -6.500000 -0.002989
+s 0
+f 209 208 212 214
+f 214 212 218 215
+f 211 218 212 210
+f 208 210 212
+f 219 213 214 215
+f 209 214 213
+f 217 215 218 216
+f 216 218 211
+f 217 219 215
+f 209 213 219 217 216 211 210 208
+o Triangular_cupola
+v 4.500000 -6.422650 0.000000
+v 4.000000 -7.288675 0.000000
+v 4.500000 -8.154700 0.000000
+v 5.500000 -8.154700 0.000000
+v 4.500000 -7.577350 0.816497
+v 6.000000 -7.288675 0.000000
+v 5.500000 -6.422650 0.000000
+v 5.500000 -7.577351 0.816497
+v 5.000000 -6.711325 0.816497
+s 0
+f 223 227 224 222
+f 226 228 227 225
+f 221 224 228 220
+f 221 222 224
+f 227 223 225
+f 226 220 228
+f 224 227 228
+f 221 220 226 225 223 222
+</script>
+<script id="sky-vs" type="text/glsl">
+#version 300 es
+precision highp float;
+
+const vec2 VERTICES[3] = vec2[3](
+	vec2(-1.0, -1.0),
+	vec2( 3.0, -1.0),
+	vec2(-1.0,  3.0)
+);
+
+out vec2 vertex;
+
+void main(){
+	vertex = VERTICES[gl_VertexID];
+	gl_Position = vec4(vertex, 0.0, 1.0);
+}
+</script>
+<script id="sky-fs" type="text/glsl">
+#version 300 es
+precision highp float;
+precision highp sampler2D;
+
+uniform mat4 inverseCameraMatrix;
+uniform vec3 cameraPosition;
+
+in vec2 vertex;
+
+layout (location = 0) out vec4 fragColor;
+
+vec3 perspectiveDivide(vec4 v) {
+	return v.xyz / v.w;
+}
+
+void main(){
+	vec4 clipSpaceNearPlanePosition = inverseCameraMatrix * vec4(vertex, -1.0, 1.0);
+	vec3 viewDirection = normalize(perspectiveDivide(clipSpaceNearPlanePosition) - cameraPosition);
+
+	vec3 skyColor = mix(vec3(0.6, 0.7, 0.8), vec3(0.2, 0.3, 0.4), viewDirection.z);
+
+	vec3 sunDirection = normalize(vec3(1.0, 2.0, 3.0));
+
+	vec3 sunColor = vec3(0.9, 0.6, 0.3) / acos(clamp(dot(sunDirection, viewDirection), -1.0, 0.9999)) / 32.0;
+
+	fragColor = vec4(pow(skyColor + sunColor, vec3(1.0 / 2.2)), 1.0);
+}
+</script>
+<script id="image-vs" type="text/glsl">
+#version 300 es
+precision highp float;
+
+uniform vec2 imageCenter;
+uniform vec2 imageSize;
+
+const vec2 VERTICES[6] = vec2[6](
+	vec2(-1.0, -1.0),
+	vec2( 1.0, -1.0),
+	vec2(-1.0,  1.0),
+	vec2(-1.0,  1.0),
+	vec2( 1.0, -1.0),
+	vec2( 1.0,  1.0)
+);
+
+out vec2 texcoord;
+
+void main(){
+	vec2 vertex = VERTICES[gl_VertexID];
+	gl_Position = vec4(imageCenter + imageSize * vertex, 0.0, 1.0);
+	texcoord = vertex * 0.5 + vec2(0.5);
+}
+</script>
+<script id="image-fs" type="text/glsl">
+#version 300 es
+precision highp float;
+precision highp sampler2D;
+
+uniform sampler2D imageTexture;
+uniform vec4 imageColor;
+
+in vec2 texcoord;
+
+layout (location = 0) out vec4 fragColor;
+
+void main(){
+	vec4 color = texture(imageTexture, texcoord) * imageColor;
+	fragColor = vec4(pow(color.rgb, vec3(1.0 / 2.2)), color.a);
+}
+</script>
+<script id="ground-vs" type="text/glsl">
+#version 300 es
+precision highp float;
+
+uniform mat4 cameraMatrix;
+
+layout (location = 0) in vec4 inPosition;
+
+out vec4 clipPosition;
+
+void main(){
+	clipPosition = inPosition;
+	gl_Position = cameraMatrix * inPosition;
+}
+</script>
+<script id="ground-fs" type="text/glsl">
+#version 300 es
+precision highp float;
+precision highp sampler2D;
+
+uniform sampler2D gridTexture;
+
+in vec4 clipPosition;
+
+layout (location = 0) out vec4 fragColor;
+
+void main(){
+	vec3 position = clipPosition.xyz / clipPosition.w;
+	vec3 color = texture(gridTexture, position.xy).rgb;
+	fragColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
+}
+</script>
+<script id="primitive-vs" type="text/glsl">
+#version 300 es
+precision highp float;
+
+uniform mat4 cameraMatrix;
+uniform vec3 instanceOffset;
+uniform float instanceScale;
+uniform vec4 instanceRotation;
+
+layout (location = 0) in vec3 inPosition;
+layout (location = 1) in float inEdge;
+layout (location = 2) in vec3 inNormal;
+
+out float edge;
+out vec3 normal;
+
+vec3 quatRotate(vec4 q, vec3 v) {
+	vec3 t = 2.0 * cross(q.xyz, v);
+	return v + q.w * t + cross(q.xyz, t);
+}
+
+void main(){
+	gl_Position = cameraMatrix * vec4(quatRotate(instanceRotation, inPosition) * instanceScale + instanceOffset, 1.0);
+	edge = inEdge;
+	normal = quatRotate(instanceRotation, inNormal);
+}
+</script>
+<script id="primitive-fs" type="text/glsl">
+#version 300 es
+precision highp float;
+precision highp sampler2D;
+
+uniform sampler2D edgeTexture;
+uniform vec4 albedo;
+uniform vec4 edgeAlbedo;
+uniform vec4 emission;
+uniform vec4 edgeEmission;
+
+in float edge;
+in vec3 normal;
+
+layout (location = 0) out vec4 fragColor;
+
+void main(){
+	vec3 lightDirection = normalize(vec3(1.0, 2.0, 3.0));
+	vec3 ambientLight = vec3(0.1, 0.2, 0.3);
+	vec3 lightColor = vec3(0.9, 0.6, 0.3);
+
+	float edgeFactor = texture(edgeTexture, vec2(edge, 0.5)).r;
+
+	vec4 finalAlbedo = mix(albedo, edgeAlbedo, edgeFactor);
+	vec4 finalEmission = mix(emission, edgeEmission, edgeFactor);
+
+	finalAlbedo.rgb *= finalAlbedo.a;
+	finalEmission.rgb *= finalEmission.a;
+	
+	float lightness = pow(0.5 + 0.5 * dot(normalize(normal), lightDirection), 2.0);
+
+	vec4 color = finalAlbedo * vec4(ambientLight + lightness * lightColor, 1.0);
+	color = color * (1.0 - finalEmission.a) + finalEmission;
+
+	fragColor = vec4(pow(color.rgb, vec3(1.0 / 2.2)), color.a);
+}
+</script>
+<script type="text/javascript">
+'use strict';
+
+// TODO:
+// * Non-face-transitive primitives (e.g. square cupola)
+// * Moving/rotating connected instance chunks
+// * Rotating privitives when placing on ground
+// * Instanced rendering
+// * Spatial index for collisions & raycast
+
+function assert(condition, message = "Assertion failed") {
+	if (!condition) {
+		throw new Error(message);
+	}
+	return condition;
+}
+
+class Vector {
+	constructor(...args) {
+		this.coords = args;
+	}
+
+	size() {
+		return this.coords.length;
+	}
+
+	copy() {
+		return new Vector(...this.coords);
+	}
+
+	static zero(length) {
+		let result = new Vector();
+		result.coords = new Array(length).fill(0);
+		return result;
+	}
+	
+	add(v) {
+		assert(this.size() == v.size());
+		let result = new Vector();
+		result.coords = new Array(this.size());
+		for (let i = 0; i < this.size(); ++i) {
+			result.coords[i] = this.coords[i] + v.coords[i];
+		}
+		return result;
+	}
+
+	sub(v) {
+		assert(this.size() == v.size());
+		let result = new Vector();
+		result.coords = new Array(this.size());
+		for (let i = 0; i < this.size(); ++i) {
+			result.coords[i] = this.coords[i] - v.coords[i];
+		}
+		return result;
+	}
+	
+	mult(s) {
+		let result = new Vector();
+		result.coords = new Array(this.size());
+		for (let i = 0; i < this.size(); ++i) {
+			result.coords[i] = this.coords[i] * s;
+		}
+		return result;
+	}
+
+	dot(v) {
+		assert(this.size() == v.size());
+		let sum = 0;
+		for (let i = 0; i < this.size(); ++i) {
+			sum += this.coords[i] * v.coords[i];
+		}
+		return sum;
+	}
+
+	length() {
+		return Math.sqrt(this.dot(this));
+	}
+
+	cross(v) {
+		assert(this.size() == 3);
+		assert(v.size() == 3);
+		return new Vector(
+			this.coords[1] * v.coords[2] - this.coords[2] * v.coords[1],
+			this.coords[2] * v.coords[0] - this.coords[0] * v.coords[2],
+			this.coords[0] * v.coords[1] - this.coords[1] * v.coords[0],
+		);
+	}
+
+	normalized() {
+		return this.copy().mult(1 / this.length());
+	}
+}
+
+function det3(v0, v1, v2) {
+	return v0.dot(v1.cross(v2));
+}
+
+class Ray {
+	constructor(origin, direction) {
+		this.origin = origin;
+		this.direction = direction;
+	}
+
+	get(t) {
+		return this.origin.add(this.direction.mult(t));
+	}
+
+	// Intersect with plane dot(normal,p)=offset
+	intersectPlane(normal, offset) {
+		let t = (offset - this.origin.dot(normal)) / this.direction.dot(normal);
+		if (t >= 0) return t;
+		return null;
+	}
+
+	intersectTriangle(p0, p1, p2) {
+		// o + t*d = p0 + u * (p1 - p0) + v * (p2 - p0)
+		// t*d - u*(p1-p0) - v*(p2-p0) = p0-o
+
+		let d1 = p0.sub(p1);
+		let d2 = p0.sub(p2);
+		let b = p0.sub(this.origin);
+
+		let det = det3(this.direction, d1, d2);
+		let t = det3(b, d1, d2) / det;
+		let u = det3(this.direction, b, d2) / det;
+		let v = det3(this.direction, d1, b) / det;
+
+		if (t < 0 || u < 0 || v < 0 || u + v > 1) return null;
+		return t;
+	}
+}
+
+class Quaternion {
+	constructor(x, y, z, w) {
+		this.coords = [x, y, z, w];
+	}
+
+	copy() {
+		return new Quaternion(...this.coords);
+	}
+
+	rotate(v) {
+		assert(v.size() == 3);
+		let q = new Vector(this.coords[0], this.coords[1], this.coords[2]);
+		let t = q.cross(v).mult(2);
+		return v.add(t.mult(this.coords[3])).add(q.cross(t));
+	}
+
+	normalized() {
+		let sum = 0;
+		for (let v of this.coords) {
+			sum += v * v;
+		}
+		sum = Math.sqrt(sum);
+		return new Quaternion(this.coords[0] / sum, this.coords[1] / sum, this.coords[2] / sum, this.coords[3] / sum);
+	}
+
+	mult(q) {
+		return new Quaternion(
+			this.coords[3] * q.coords[0] + this.coords[0] * q.coords[3] + this.coords[1] * q.coords[2] - this.coords[2] * q.coords[1],
+			this.coords[3] * q.coords[1] - this.coords[0] * q.coords[2] + this.coords[1] * q.coords[3] + this.coords[2] * q.coords[0],
+			this.coords[3] * q.coords[2] + this.coords[0] * q.coords[1] - this.coords[1] * q.coords[0] + this.coords[2] * q.coords[3],
+			this.coords[3] * q.coords[3] - this.coords[0] * q.coords[0] - this.coords[1] * q.coords[1] - this.coords[2] * q.coords[2],
+		);
+	}
+
+	inverse() {
+		return new Quaternion(
+			- this.coords[0],
+			- this.coords[1],
+			- this.coords[2],
+			  this.coords[3],
+		);
+	}
+
+	static axisAngle(axis, angle) {
+		let c = Math.cos(angle / 2);
+		let s = Math.sin(angle / 2);
+		return new Quaternion(axis.coords[0] * s, axis.coords[1] * s, axis.coords[2] * s, c);
+	}
+
+	static fromTo(v1, v2, n) {
+		assert(v1.size() == 3);
+		assert(v2.size() == 3);
+		let d = v1.dot(v2);
+		if (d + 1 < 1e-6) {
+			// v1 + v2 ~ 0
+			if (!n) {
+				if (Math.abs(v1.coords[0]) > 0.5) {
+					n = new Vector(0, 1, 0).cross(v1).normalized();
+				} else {
+					n = new Vector(1, 0, 0).cross(v1).normalized();
+				}
+			}
+			return Quaternion.axisAngle(n, Math.PI);
+		}
+		let q = v1.cross(v2);
+		return new Quaternion(q.coords[0], q.coords[1], q.coords[2], 1 + d).normalized();
+	}
+
+	static identity() {
+		return new Quaternion(0, 0, 0, 1);
+	}
+}
+
+class AABB {
+	constructor(min, max) {
+		this.min = min;
+		this.max = max;
+	}
+
+	static empty(size) {
+		return new AABB(
+			new Vector(...new Array(size).fill(Infinity)),
+			new Vector(...new Array(size).fill(-Infinity)),
+		);
+	}
+
+	extend(p) {
+		assert(this.min.size() == p.size());
+		for (let i = 0; i < p.size(); ++i) {
+			this.min.coords[i] = Math.min(this.min.coords[i], p.coords[i]);
+			this.max.coords[i] = Math.max(this.max.coords[i], p.coords[i]);
+		}
+	}
+}
+
+class Matrix {
+	constructor() {
+		this.coords = null;
+		this.rows = 0;
+		this.columns = 0;
+	}
+
+	copy() {
+		let result = new Matrix();
+		result.coords = [...this.coords];
+		result.rows = this.rows;
+		result.columns = this.columns;
+		return result;
+	}
+
+	get(row, column) {
+		return this.coords[column * this.rows + row];
+	}
+
+	set(row, column, value) {
+		this.coords[column * this.rows + row] = value;
+	}
+
+	static empty(rows, columns) {
+		let result = new Matrix();
+		result.coords = new Array(rows * columns);
+		result.rows = rows;
+		result.columns = columns;
+		return result;
+	}
+
+	static zero(rows, columns) {
+		let result = Matrix.empty(rows, columns);
+		result.coords.fill(0);
+		return result;
+	}
+
+	static scalar(size, value) {
+		let result = Matrix.zero(size, size);
+		for (let i = 0; i < size; ++i) {
+			result.set(i, i, value);
+		}
+		return result;
+	}
+
+	static identity(size) {
+		return Matrix.scalar(size, 1);
+	}
+
+	mult(m) {
+		assert(this.columns == m.rows);
+
+		let result = Matrix.zero(this.rows, m.columns);
+		for (let i = 0; i < this.rows; ++i) {
+			for (let j = 0; j < m.columns; ++j) {
+				let sum = 0;
+				for (let k = 0; k < this.columns; ++k) {
+					sum += this.get(i, k) * m.get(k, j);
+				}
+				result.set(i, j, sum);
+			}
+		}
+
+		return result;
+	}
+
+	static solve(lhs, ...rhs) {
+		assert(lhs.rows == lhs.columns);
+		for (let x of rhs) {
+			if (x instanceof Vector) {
+				assert(x.size() == lhs.rows);
+			} else if (x instanceof Matrix) {
+				assert(x.rows == lhs.rows);
+			} else {
+				assert(false);
+			}
+		}
+
+		// Gauss algorithm
+
+		// Forward elimination
+		for (let i = 0; i < lhs.rows; ++i) {
+			// Find maximal modulus along i-th column
+			let m = Math.abs(lhs.get(i, i));
+			let k = i;
+			for (let j = i + 1; j < lhs.rows; ++j) {
+				let n = Math.abs(lhs.get(j, i));
+				if (n > m) {
+					m = n;
+					k = j;
+				}
+			}
+
+			// Avoid dividing by zero
+			if (m == 0)
+				return false;
+
+			// Swap rows i & k
+			if (i != k)
+			{
+				for (let j = i; j < lhs.rows; ++j) {
+					let temp = lhs.get(i, j);
+					lhs.set(i, j, lhs.get(k, j));
+					lhs.set(k, j, temp);
+				}
+
+				for (let x of rhs) {
+					if (x instanceof Vector) {
+						let temp = x.coords[i];
+						x.coords[i] = x.coords[k];
+						x.coords[k] = temp;
+					} else if (x instanceof Matrix) {
+						for (let j = 0; j < x.columns; ++j) {
+							let temp = x.get(i, j);
+							x.set(i, j, x.get(k, j));
+							x.set(k, j, temp);
+						}
+					}
+				}
+			}
+
+			// Divide i-th row by lhs(i,i)
+			{
+				let r = lhs.get(i, i);
+				for (let j = i; j < lhs.rows; ++j) {
+					lhs.set(i, j, lhs.get(i, j) / r);
+				}
+
+				for (let x of rhs) {
+					if (x instanceof Vector) {
+						x.coords[i] /= r;
+					} else if (x instanceof Matrix) {
+						for (let j = 0; j < x.columns; ++j) {
+							x.set(i, j, x.get(i, j) / r);
+						}
+					}
+				}
+			}
+
+			// Subtract appropriate multiples of current row to
+			// zero-out the remaining elements of the i-th column
+			for (let k = i + 1; k < lhs.rows; ++k) {
+				let r = lhs.get(k, i);
+				for (let j = i; j < lhs.rows; ++j) {
+					lhs.set(k, j, lhs.get(k, j) - lhs.get(i, j) * r);
+				}
+
+				for (let x of rhs) {
+					if (x instanceof Vector) {
+						x.coords[k] -= x.coords[i] * r;
+					} else if (x instanceof Matrix) {
+						for (let j = 0; j < x.columns; ++j) {
+							x.set(k, j, x.get(k, j) - x.get(i, j) * r);
+						}
+					}
+				}
+			}
+		}
+
+		// Backward elimination
+		for (let i = lhs.rows - 1; i >= 0; --i) {
+			for (let k = 0; k < i; ++k) {
+				let r = lhs.get(k, i);
+				lhs.set(k, i, 0);
+
+				for (let x of rhs) {
+					if (x instanceof Vector) {
+						x.coords[k] -= x.coords[i] * r;
+					} else if (x instanceof Matrix) {
+						for (let j = 0; j < x.columns; ++j) {
+							x.set(k, j, x.get(k, j) - x.get(i, j) * r);
+						}
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	inverse() {
+		assert(this.rows == this.columns);
+		let result = Matrix.identity(this.rows);
+		if (!Matrix.solve(this.copy(), result))
+			return null;
+		return result;
+	}
+
+	static rotationXY(a) {
+		let r = Matrix.identity(4);
+		r.set(0, 0, Math.cos(a));
+		r.set(0, 1, -Math.sin(a));
+		r.set(1, 0, Math.sin(a));
+		r.set(1, 1, Math.cos(a));
+		return r;
+	}
+
+	static rotationYZ(a) {
+		let r = Matrix.identity(4);
+		r.set(1, 1, Math.cos(a));
+		r.set(1, 2, -Math.sin(a));
+		r.set(2, 1, Math.sin(a));
+		r.set(2, 2, Math.cos(a));
+		return r;
+	}
+
+	static rotationZX(a) {
+		let r = Matrix.identity(4);
+		r.set(2, 2, Math.cos(a));
+		r.set(2, 0, -Math.sin(a));
+		r.set(0, 2, Math.sin(a));
+		r.set(0, 0, Math.cos(a));
+		return r;
+	}
+
+	static translation(v) {
+		assert(v.size() == 3);
+		let r = Matrix.identity(4);
+		r.set(0, 3, v.coords[0]);
+		r.set(1, 3, v.coords[1]);
+		r.set(2, 3, v.coords[2]);
+		return r;
+	}
+
+	static scaling(v) {
+		assert(v.size() == 3);
+		let r = Matrix.identity(4);
+		r.set(0, 0, v.coords[0]);
+		r.set(1, 1, v.coords[1]);
+		r.set(2, 2, v.coords[2]);
+		return r;
+	}
+
+	static perspective(right, top, near, far) {
+		let r = Matrix.zero(4, 4);
+		r.set(0, 0, near / right);
+		r.set(1, 1, near / top);
+		r.set(2, 2, - (far + near) / (far - near));
+		r.set(2, 3, - 2 * far * near / (far - near));
+		r.set(3, 2, -1);
+		return r;
+	}
+}
+
+class Frame {
+	constructor(canvas) {
+		this.canvas = canvas;
+		this.canvas.onmousedown = (event) => { this.onMouseDown(event); };
+		this.canvas.onmouseup = (event) => { this.onMouseUp(event); };
+		this.canvas.onmousemove = (event) => { this.onMouseMove(event); };
+		this.canvas.onwheel = (event) => { this.onMouseWheel(event); };
+		document.onkeydown = (event) => { this.onKeyDown(event); };
+		document.onkeyup  = (event) => { this.onKeyUp(event); };
+		this.mouseDown = [false, false, false];
+		this.mouse = new Vector(0, 0);
+		this.mouseRelative = new Vector(0, 0);
+		this.wheelRelative = 0;
+		this.keyDown = new Set();
+		this.gl = canvas.getContext("webgl2", { alpha: false });
+	}
+
+	onResize() {
+		this.canvas.width  = this.canvas.clientWidth;
+		this.canvas.height = this.canvas.clientHeight;
+		this.aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	onMouseDown(event) {
+		this.mouseDown[event.button] = true;
+		this.mouse = new Vector(event.clientX, event.clientY);
+	}
+
+	onMouseUp(event) {
+		this.mouseDown[event.button] = false;
+		this.mouse = new Vector(event.clientX, event.clientY);
+	}
+
+	onMouseMove(event) {
+		let newMouse = new Vector(event.clientX, event.clientY);
+		let newMovement = new Vector(event.movementX || (event.clientX - this.mouse.coords[0]), event.movementY || (event.clientY - this.mouse.coords[1]));
+		this.mouseRelative = this.mouseRelative.add(newMovement);
+		this.mouse = newMouse;
+	}
+
+	onMouseWheel(event) {
+		this.wheelRelative += event.deltaY / 120;
+	}
+
+	onKeyDown(event) {
+		this.keyDown.add(event.code);
+	}
+
+	onKeyUp(event) {
+		this.keyDown.delete(event.code);
+	}
+
+	update(dt) {}
+
+	draw() {
+		let gl = this.gl;
+
+		this.processInput();
+
+		gl.clearColor(1, 0, 1, 1);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+
+	processInputs() {
+		this.mouseRelative = new Vector(0, 0);
+		this.wheelRelative = 0;
+	}
+
+	loadBuffer(data, target) {
+		let gl = this.gl;
+
+		let result = gl.createBuffer();
+		gl.bindBuffer(target, result);
+		gl.bufferData(target, data, gl.STATIC_DRAW, 0);
+		return result;
+	}
+
+	loadShader(name, type) {
+		let gl = this.gl;
+
+		let script = assert(document.getElementById(name), "Shader " + name + " not found");
+		
+		let shader = gl.createShader(type);
+		gl.shaderSource(shader, script.textContent.trimStart());
+		gl.compileShader(shader);
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+			throw new Error("Shader " + name + ": " + gl.getShaderInfoLog(shader));
+		}
+
+		return shader;
+	}
+
+	loadProgram(name) {
+		let gl = this.gl;
+
+		let program = gl.createProgram();
+		gl.attachShader(program, this.loadShader(name+"-vs", gl.VERTEX_SHADER));
+		gl.attachShader(program, this.loadShader(name+"-fs", gl.FRAGMENT_SHADER));
+		gl.linkProgram(program);
+
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			throw new Error("Program " + name + ": " + gl.getProgramInfoLog(program));
+		}
+
+		let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+		for (let u = 0; u < uniformCount; ++u) {
+			let uniformInfo = gl.getActiveUniform(program, u);
+			let name = uniformInfo.name;
+			let location = gl.getUniformLocation(program, name);
+			Object.defineProperty(program, name, {
+				get: () => {
+					return {
+						location: location
+					};
+				},
+				set: (value) => {
+					if (uniformInfo.type == gl.FLOAT_MAT4) {
+						gl.uniformMatrix4fv(location, false, value.coords);
+					}
+					if (uniformInfo.type == gl.FLOAT) {
+						gl.uniform1f(location, value);
+					}
+					if (uniformInfo.type == gl.FLOAT_VEC2) {
+						gl.uniform2fv(location, value.coords);
+					}
+					if (uniformInfo.type == gl.FLOAT_VEC3) {
+						gl.uniform3fv(location, value.coords);
+					}
+					if (uniformInfo.type == gl.FLOAT_VEC4) {
+						gl.uniform4fv(location, value.coords);
+					}
+				}
+			});
+		}
+
+		return program;
+	}
+}
+
+class Mesh {
+	constructor(gl, vertexArray, vertexBuffer, indexBuffer, indexCount) {
+		this.gl = gl;
+		this.vertexArray = vertexArray;
+		this.vertexBuffer = vertexBuffer;
+		this.indexBuffer = indexBuffer;
+		this.indexCount = indexCount;
+	}
+
+	draw() {
+		let gl = this.gl;
+		gl.bindVertexArray(this.vertexArray);
+		gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
+	}
+}
+
+class Camera {
+	constructor() {
+		this.aspectRatio = 1;
+		this.position = new Vector(0, 0, 0);
+		this.xAngle = 0;
+		this.yAngle = 0;
+		this.fovY = Math.PI / 2;
+	}
+
+	resize(width, height) {
+		this.aspectRatio = width / height;
+	}
+
+	forwardAxisFlat() {
+		return new Vector(Math.cos(this.xAngle), Math.sin(this.xAngle), 0.0);
+	}
+
+	rightAxisFlat() {
+		return new Vector(Math.sin(this.xAngle), -Math.cos(this.xAngle), 0.0);
+	}
+
+	forwardAxis() {
+		let sx = Math.sin(this.xAngle);
+		let cx = Math.cos(this.xAngle);
+		let sy = Math.sin(this.yAngle);
+		let cy = Math.cos(this.yAngle);
+		return new Vector(cx * cy, sx * cy, sy);
+	}
+
+	forwardRay() {
+		return new Ray(this.position, this.forwardAxis());
+	}
+
+	viewMatrix() {
+		return Matrix.rotationZX(this.yAngle)
+			.mult(Matrix.rotationXY(-this.xAngle))			
+			.mult(Matrix.translation(new Vector(0, 0, 0).sub(this.position)));
+	}
+
+	projectionMatrix() {
+		let tanY = Math.tan(this.fovY / 2);
+		let near = 0.1;
+		let top = near * tanY;
+		let far = 1000.0;
+		return Matrix.perspective(this.aspectRatio * top, top, near, far)
+			.mult(Matrix.rotationXY(Math.PI/2.0))
+			.mult(Matrix.rotationZX(Math.PI/2.0))
+			;
+	}
+}
+
+function pointOfMinimumNorm1(simplex) {
+	return [simplex[0], [0], []];
+}
+
+function pointOfMinimumNorm2(simplex) {
+	let delta01 = simplex[1].sub(simplex[0]);
+
+	let dot_0_01 =   simplex[0].dot(delta01);
+
+	if (dot_0_01 >= 0) {
+		return [simplex[0], [0], []];
+	}
+
+	let dot_1_10 = - simplex[1].dot(delta01);
+
+	if (dot_1_10 >= 0) {
+		return [simplex[1], [1], []];
+	}
+
+	{
+		let t = - dot_0_01 / delta01.dot(delta01);
+		let p = simplex[0].add(delta01.mult(t));
+		return [p, [0, 1], [t]];
+	}
+}
+
+function pointOfMinimumNorm3(simplex) {
+	let delta01 = simplex[1].sub(simplex[0]);
+	let delta02 = simplex[2].sub(simplex[0]);
+
+	let dot_0_01 =   simplex[0].dot(delta01);
+	let dot_0_02 =   simplex[0].dot(delta02);
+
+	if (dot_0_01 >= 0 && dot_0_02 >= 0) {
+		return [simplex[0], [0], []];
+	}
+
+	let delta12 = simplex[2].sub(simplex[1]);
+
+	let dot_1_10 = - simplex[1].dot(delta01);
+	let dot_1_12 =   simplex[1].dot(delta12);
+
+	if (dot_1_10 >= 0 && dot_1_12 >= 0) {
+		return [simplex[1], [1], []];
+	}
+
+	let dot_2_20 = - simplex[2].dot(delta02);
+	let dot_2_21 = - simplex[2].dot(delta12);
+
+	if (dot_2_20 >= 0 && dot_2_21 >= 0) {
+		return [simplex[2], [2], []];
+	}
+
+	let n012 = delta01.cross(delta02);
+
+	let dot_0_dcross_01_n012 =   simplex[0].dot(delta01.cross(n012));
+
+	if (dot_0_01 <= 0 && dot_1_10 <= 0 && dot_0_dcross_01_n012 <= 0) {
+		let t = - dot_0_01 / delta01.dot(delta01);
+		let p = simplex[0].add(delta01.mult(t));
+		return [p, [0, 1], [t]];
+	}
+
+
+	let dot_0_cross_02_n021 = - simplex[0].dot(delta02.cross(n012));
+
+	if (dot_0_02 <= 0 && dot_2_20 <= 0 && dot_0_cross_02_n021 <= 0) {
+		let t = - dot_0_02 / delta02.dot(delta02)
+		let p = simplex[0].add(delta02.mult(t));
+		return [p, [0, 2], [t]];
+	}
+
+	let dot_1_cross_12_n120 =   simplex[1].dot(delta12.cross(n012));
+
+	if (dot_1_12 <= 0 && dot_2_21 <= 0 && dot_1_cross_12_n120 <= 0) {
+		let t = - dot_1_12 / delta12.dot(delta12);
+		let p = simplex[1].add(delta12.mult(t));
+		return [p, [1, 2], [t]];
+	}
+
+	{
+		let dot_01_01 = delta01.dot(delta01);
+		let dot_01_02 = delta01.dot(delta02);
+		let dot_02_02 = delta02.dot(delta02);
+		let det = dot_01_01 * dot_02_02 - dot_01_02 * dot_01_02;
+		let u = - (dot_0_01 * dot_02_02 - dot_0_02 * dot_01_02) / det;
+		let v = - (dot_0_02 * dot_01_01 - dot_0_01 * dot_01_02) / det;
+		let p = simplex[0].add(delta01.mult(u)).add(delta02.mult(v));
+		return [p, [0, 1, 2], [u, v]];
+	}
+}
+
+function pointOfMinimumNorm4(simplex) {
+	let delta01 = simplex[1].sub(simplex[0]);
+	let delta02 = simplex[2].sub(simplex[0]);
+	let delta03 = simplex[3].sub(simplex[0]);
+
+	let dot_0_01 =   simplex[0].dot(delta01);
+	let dot_0_02 =   simplex[0].dot(delta02);
+	let dot_0_03 =   simplex[0].dot(delta03);
+
+	if (dot_0_01 >= 0 && dot_0_02 >= 0 && dot_0_03 >= 0) {
+		return [simplex[0], [0], []];
+	}
+
+	let delta12 = simplex[2].sub(simplex[1]);
+	let delta13 = simplex[3].sub(simplex[1]);
+
+	let dot_1_10 = - simplex[1].dot(delta01);
+	let dot_1_12 =   simplex[1].dot(delta12);
+	let dot_1_13 =   simplex[1].dot(delta13);
+
+	if (dot_1_10 >= 0 && dot_1_12 >= 0 && dot_1_13 >= 0) {
+		return [simplex[1], [1], []];
+	}
+
+	let delta23 = simplex[3].sub(simplex[2]);
+
+	let dot_2_20 = - simplex[2].dot(delta02);
+	let dot_2_21 = - simplex[2].dot(delta12);
+	let dot_2_23 =   simplex[2].dot(delta23);
+
+	if (dot_2_20 >= 0 && dot_2_21 >= 0 && dot_2_23 >= 0) {
+		return [simplex[2], [2], []];
+	}
+
+	let dot_3_30 = - simplex[3].dot(delta03);
+	let dot_3_31 = - simplex[3].dot(delta13);
+	let dot_3_32 = - simplex[3].dot(delta23);
+
+	if (dot_3_30 >= 0 && dot_3_31 >= 0 && dot_3_32 >= 0) {
+		return [simplex[3], [3], []];
+	}
+
+	let n012 = delta01.cross(delta02);
+	let n013 = delta01.cross(delta03);
+
+	let dot_0_dcross_01_n012 =   simplex[0].dot(delta01.cross(n012));
+	let dot_0_dcross_01_n013 =   simplex[0].dot(delta01.cross(n013));
+
+	if (dot_0_01 <= 0 && dot_1_10 <= 0 && dot_0_dcross_01_n012 <= 0 && dot_0_dcross_01_n013 <= 0) {
+		let t = - dot_0_01 / delta01.dot(delta01);
+		let p = simplex[0].add(delta01.mult(t));
+		return [p, [0, 1], [t]];
+	}
+
+	let n023 = delta02.cross(delta03);
+
+	let dot_0_cross_02_n021 = - simplex[0].dot(delta02.cross(n012));
+	let dot_0_cross_02_n023 =   simplex[0].dot(delta02.cross(n023));
+
+	if (dot_0_02 <= 0 && dot_2_20 <= 0 && dot_0_cross_02_n021 <= 0 && dot_0_cross_02_n023 <= 0) {
+		let t = - dot_0_02 / delta02.dot(delta02)
+		let p = simplex[0].add(delta02.mult(t));
+		return [p, [0, 2], [t]];
+	}
+
+	let n123 = delta12.cross(delta23);
+
+	let dot_0_cross_03_n031 = - simplex[0].dot(delta03.cross(n013));
+	let dot_0_cross_03_n032 = - simplex[0].dot(delta03.cross(n023));
+
+	if (dot_0_03 <= 0 && dot_3_30 <= 0 && dot_0_cross_03_n031 <= 0 && dot_0_cross_03_n032 <= 0) {
+		let t = - dot_0_03 / delta03.dot(delta03);
+		let p = simplex[0].add(delta03.mult(t));
+		return [p, [0, 3], [t]];
+	}
+
+	let dot_1_cross_12_n120 =   simplex[1].dot(delta12.cross(n012));
+	let dot_1_cross_12_n123 =   simplex[1].dot(delta12.cross(n123));
+
+	if (dot_1_12 <= 0 && dot_2_21 <= 0 && dot_1_cross_12_n120 <= 0 && dot_1_cross_12_n123 <= 0) {
+		let t = - dot_1_12 / delta12.dot(delta12);
+		let p = simplex[1].add(delta12.mult(t));
+		return [p, [1, 2], [t]];
+	}
+
+	let dot_1_cross_13_n130 =   simplex[1].dot(delta13.cross(n013));
+	let dot_1_cross_13_n132 = - simplex[1].dot(delta13.cross(n123));
+
+	if (dot_1_13 <= 0 && dot_3_31 <= 0 && dot_1_cross_13_n130 <= 0 && dot_1_cross_13_n132 <= 0) {
+		let t = - dot_1_13 / delta13.dot(delta13);
+		let p = simplex[1].add(delta13.mult(t));
+		return [p, [1, 3], [t]];
+	}
+
+	let dot_2_cross_23_n230 =   simplex[2].dot(delta23.cross(n023));
+	let dot_2_cross_23_n231 =   simplex[2].dot(delta23.cross(n123));
+
+	if (dot_2_23 <= 0 && dot_3_32 <= 0 && dot_2_cross_23_n230 <= 0 && dot_2_cross_23_n231 <= 0) {
+		let t = - dot_2_23 / delta23.dot(delta23);
+		let p = simplex[2].add(delta23.mult(t));
+		return [p, [2, 3], [t]];
+	}
+
+	if (  simplex[0].dot(n012) * delta03.dot(n012) >= 0) {
+		let dot_01_01 = delta01.dot(delta01);
+		let dot_01_02 = delta01.dot(delta02);
+		let dot_02_02 = delta02.dot(delta02);
+		let det = dot_01_01 * dot_02_02 - dot_01_02 * dot_01_02;
+		let u = - (dot_0_01 * dot_02_02 - dot_0_02 * dot_01_02) / det;
+		let v = - (dot_0_02 * dot_01_01 - dot_0_01 * dot_01_02) / det;
+		let p = simplex[0].add(delta01.mult(u)).add(delta02.mult(v));
+		return [p, [0, 1, 2], [u, v]];
+	}
+
+	if (  simplex[0].dot(n013) * delta02.dot(n013) >= 0) {
+		let dot_01_01 = delta01.dot(delta01);
+		let dot_01_03 = delta01.dot(delta03);
+		let dot_03_03 = delta03.dot(delta03);
+		let det = dot_01_01 * dot_03_03 - dot_01_03 * dot_01_03;
+		let u = - (dot_0_01 * dot_03_03 - dot_0_03 * dot_01_03) / det;
+		let v = - (dot_0_03 * dot_01_01 - dot_0_01 * dot_01_03) / det;
+		let p = simplex[0].add(delta01.mult(u)).add(delta03.mult(v));
+		return [p, [0, 1, 3], [u, v]];
+	}
+
+	if (  simplex[0].dot(n023) * delta01.dot(n023) >= 0) {
+		let dot_02_02 = delta02.dot(delta02);
+		let dot_02_03 = delta02.dot(delta03);
+		let dot_03_03 = delta03.dot(delta03);
+		let det = dot_02_02 * dot_03_03 - dot_02_03 * dot_02_03;
+		let u = - (dot_0_02 * dot_03_03 - dot_0_03 * dot_02_03) / det;
+		let v = - (dot_0_03 * dot_02_02 - dot_0_02 * dot_02_03) / det;
+		let p = simplex[0].add(delta02.mult(u)).add(delta03.mult(v));
+		return [p, [0, 2, 3], [u, v]];
+	}
+
+	if (- simplex[1].dot(n123) * delta01.dot(n123) >= 0) {
+		let dot_12_12 = delta12.dot(delta12);
+		let dot_12_13 = delta12.dot(delta13);
+		let dot_13_13 = delta13.dot(delta13);
+		let det = dot_12_12 * dot_13_13 - dot_12_13 * dot_12_13;
+		let u = - (dot_1_12 * dot_13_13 - dot_1_13 * dot_12_13) / det;
+		let v = - (dot_1_13 * dot_12_12 - dot_1_12 * dot_12_13) / det;
+		let p = simplex[1].add(delta12.mult(u)).add(delta13.mult(v));
+		return [p, [1, 2, 3], [u, v]];
+	}
+
+	// TODO: do we need barycentrics here?
+	return [new Vector(0, 0, 0), [0, 1, 2, 3]];
+}
+
+// Returns a pair [point, subsimplex containing the point]
+// The subsimplex is reported as a list of vertex id's, like [0, 2, 3]
+// Implementation based on Christer Ericson - Real-Time Collision Detection,
+// section 9.5.2 Finding the Point of Minimum Norm in a Simplex
+function pointOfMinimumNorm(simplex) {
+	if (simplex.length == 1) {
+		return pointOfMinimumNorm1(simplex);
+	} else if (simplex.length == 2) {
+		return pointOfMinimumNorm2(simplex);
+	} else if (simplex.length == 3) {
+		return pointOfMinimumNorm3(simplex);
+	} else if (simplex.length == 4) {
+		return pointOfMinimumNorm4(simplex);
+	} else {
+		assert(false);
+	}
+}
+
+function testPointWithMinimumNorm3() {
+	let perm3 = [
+		[0, 1, 2],
+		[0, 2, 1],
+		[1, 0, 2],
+		[1, 2, 0],
+		[2, 0, 1],
+		[2, 1, 0],
+	];
+
+	{
+		// Closest point is vertex at (1, 0, 0)
+		let q = [
+			new Vector(1, 0, 0),
+			new Vector(2, -1, 0),
+			new Vector(2, 1, 0),
+		];
+
+		for (let p of perm3) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+
+	{
+		// Closest point is along edge [0, 1] at (1, 0, 0)
+		let q = [
+			new Vector(1, 0, -1),
+			new Vector(1, 0, 2),
+			new Vector(2, 0, 0),
+		];
+
+		for (let p of perm3) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+
+	{
+		// Closest point is on face [0, 1, 2] at (1, 0, 0)
+		let q = [
+			new Vector(1, -1, -1),
+			new Vector(1, 1, -1),
+			new Vector(1, 0, 1),
+		];
+
+		for (let p of perm3) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+}
+
+function testPointWithMinimumNorm4() {
+	let perm4 = [
+		[0, 1, 2, 3],
+		[0, 1, 3, 2],
+		[0, 2, 1, 3],
+		[0, 2, 3, 1],
+		[0, 3, 1, 2],
+		[0, 3, 2, 1],
+		[1, 0, 2, 3],
+		[1, 0, 3, 2],
+		[1, 2, 0, 3],
+		[1, 2, 3, 0],
+		[1, 3, 0, 2],
+		[1, 3, 2, 0],
+		[2, 0, 1, 3],
+		[2, 0, 3, 1],
+		[2, 1, 0, 3],
+		[2, 1, 3, 0],
+		[2, 3, 0, 1],
+		[2, 3, 1, 0],
+		[3, 0, 1, 2],
+		[3, 0, 2, 1],
+		[3, 1, 0, 2],
+		[3, 1, 2, 0],
+		[3, 2, 0, 1],
+		[3, 2, 1, 0],
+	];
+
+	{
+		// Closest point is vertex at (1, 0, 0)
+		let q = [
+			new Vector(1, 0, 0),
+			new Vector(2, -1, 0),
+			new Vector(2, 1, -1),
+			new Vector(2, 1, 1),
+		];
+
+		for (let p of perm4) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]], q[p[3]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+
+	{
+		// Closest point is along edge [0, 1] at (1, 0, 0)
+		let q = [
+			new Vector(1, 0, -1),
+			new Vector(1, 0, 2),
+			new Vector(2, -1, 0),
+			new Vector(2, 1, 0),
+		];
+
+		for (let p of perm4) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]], q[p[3]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+
+	{
+		// Closest point is on face [0, 1, 2] at (1, 0, 0)
+		let q = [
+			new Vector(1, -1, -1),
+			new Vector(1, 1, -1),
+			new Vector(1, 0, 1),
+			new Vector(2, 0, 0),
+		];
+
+		for (let p of perm4) {
+			let res = pointOfMinimumNorm([q[p[0]], q[p[1]], q[p[2]], q[p[3]]]);
+			console.log(res[0].coords, res[1].map(i => p[i]));
+		}
+	}
+}
+
+function sphereMinusPrimitiveSupport(localSpherePosition, sphereRadius, primitive, supportDirection) {
+	let sphereSupport = localSpherePosition.add(supportDirection.mult(sphereRadius));
+
+	let primitiveSupport = null;
+	let primitiveSupportMaxDot = -Infinity;
+	for (let v of primitive.vertices) {
+		let value = - v.dot(supportDirection);
+		if (value > primitiveSupportMaxDot) {
+			primitiveSupportMaxDot = value;
+			primitiveSupport = v;
+		}
+	}
+
+	return sphereSupport.sub(primitiveSupport);
+}
+
+// Implementation based on https://cs.brown.edu/courses/cs195u/lectures/04_advancedCollisionsAndPhysics.pdf
+function collisionGJK_EPA(spherePosition, sphereRadius, instance) {
+	// Work in primitive coordinate system, convert back only before return
+	let localSpherePosition = instance.rotation.inverse().rotate(spherePosition.sub(instance.position));
+
+	// console.log("Sphere pos", localSpherePosition.coords);
+
+	// let simplex = [localSpherePosition];
+	let simplex = [];
+	let intersects = false;
+
+	{
+		let support = sphereMinusPrimitiveSupport(localSpherePosition, sphereRadius, instance.primitive, new Vector(1, 0, 0));
+		simplex.push(support);
+	}
+
+	// Main GJK loop
+	for (let iteration = 0; iteration < 64; ++iteration) {
+		let minimumNorm = pointOfMinimumNorm(simplex);
+		if (minimumNorm[0].length() < 1e-6 && simplex.length == 4) {
+			intersects = true;
+			break;
+		}
+
+		simplex = minimumNorm[1].map(i => simplex[i]);
+
+		let supportDirection = minimumNorm[0].normalized().mult(-1);
+		// console.log("Support direction", supportDirection.coords);
+
+		let support = sphereMinusPrimitiveSupport(localSpherePosition, sphereRadius, instance.primitive, supportDirection);
+
+		if (support.dot(supportDirection) < minimumNorm[0].dot(supportDirection) + 1e-6) {
+			break;
+		}
+
+		simplex.push(support);
+	}
+
+	if (!intersects)
+		return null;
+
+	// console.log(simplex);
+
+	// Restore simplex orientation
+	{
+		let n012 = simplex[1].sub(simplex[0]).cross(simplex[2].sub(simplex[0]));
+		if (simplex[3].sub(simplex[0]).dot(n012) > 0) {
+			let temp = simplex[2];
+			simplex[2] = simplex[3];
+			simplex[3] = temp;
+		}
+	}
+
+	// Initialize the expanding polytope
+	let polytopeVertices = simplex;
+	let polytopeFaces = [
+		[0, 1, 2],
+		[0, 3, 1],
+		[0, 2, 3],
+		[1, 3, 2],
+	];
+
+	// Main EPA loop
+	let closestBoundaryPoint = null;
+	for (let iteration = 0; iteration < 64; ++iteration) {
+		let closestBoundaryPointLength = Infinity;
+
+		for (let face of polytopeFaces) {
+			let minimumNormPoint = pointOfMinimumNorm(face.map(i => polytopeVertices[i]))[0];
+			let length = minimumNormPoint.length();
+			if (length < closestBoundaryPointLength) {
+				closestBoundaryPoint = minimumNormPoint;
+				closestBoundaryPointLength = length;
+			}
+		}
+
+		let supportDirection = closestBoundaryPoint.normalized();
+
+		let support = sphereMinusPrimitiveSupport(localSpherePosition, sphereRadius, instance.primitive, supportDirection);
+
+		if (supportDirection.dot(closestBoundaryPoint) + 1e-6 > supportDirection.dot(support)) {
+			break;
+		}
+
+		// Remove faces that 'see' support point and record the boudnary edges
+		let boundary = new Set();
+		let remainingFaces = [];
+		for (let face of polytopeFaces) {
+			let normal = polytopeVertices[face[1]].sub(polytopeVertices[face[0]]).cross(polytopeVertices[face[2]].sub(polytopeVertices[face[0]]));
+			if (normal.dot(support.sub(polytopeVertices[face[0]])) > 0) {
+				for (let edgeTemplate of [[0, 1], [1, 2], [2, 0]]) {
+					let edge = [face[edgeTemplate[0]], face[edgeTemplate[1]]];
+					let reverseEdge = [edge[1], edge[0]];
+					// Hack: convert edges to unique IDs to overcome JS Set lacking a custom comparator
+					let edgeID = edge[0] + edge[1] * 256;
+					let reverseEdgeID = reverseEdge[0] + reverseEdge[1] * 256;
+					if (boundary.has(reverseEdgeID)) {
+						boundary.delete(reverseEdgeID);
+					} else {
+						boundary.add(edgeID);
+					}
+				}
+			} else {
+				remainingFaces.push(face);
+			}
+		}
+		polytopeFaces = remainingFaces;
+
+		let newVertexID = polytopeVertices.length;
+		polytopeVertices.push(support);
+		for (let edgeID of boundary) {
+			let edge = [edgeID % 256, Math.floor(edgeID / 256)];
+			polytopeFaces.push([edge[0], edge[1], newVertexID]);
+		}
+	}
+
+	return instance.rotation.rotate(closestBoundaryPoint);
+}
+
+// Naive sphere-polyhedron separation:
+// 1. Decide if sphere center is inside or outside the polyhedron
+// 2. If it is inside, the minimal separation is towards the closest face
+// 3. If it is outside, iterate over all vertices, edges, and triangles, and
+//    compute the closest surface point, paying attention to the closest point
+//    actually being inside the edge/face
+function collisionNaiveSphere(spherePosition, sphereRadius, instance) {
+	// Work in primitive coordinate system, convert back only before return
+	let localSpherePosition = instance.rotation.inverse().rotate(spherePosition.sub(instance.position));
+
+	let maxInsideSeparation = null;
+	let maxInsideSeparationDepth = -Infinity;
+
+	let centerInside = true;
+	for (let face of instance.primitive.faces) {
+		let delta = localSpherePosition.sub(face.center.add(face.vertices[0]));
+		let dotn = delta.dot(face.normal);
+		if (dotn > 0) {
+			centerInside = false;
+			break;
+		}
+
+		if (dotn > maxInsideSeparationDepth) {
+			maxInsideSeparationDepth = dotn;
+			maxInsideSeparation = face.normal.mult(-dotn);
+		}
+	}
+
+	if (centerInside) {
+		return instance.rotation.rotate(maxInsideSeparation.normalized().mult(sphereRadius - maxInsideSeparationDepth));
+	}
+
+	let minOutsideSeparation = null;
+	let minOutsideSeparationDepth = Infinity;
+
+	for (let vertex of instance.primitive.vertices) {
+		let separation = localSpherePosition.sub(vertex);
+		let separationDepth = separation.length();
+
+		if (separationDepth < minOutsideSeparationDepth) {
+			minOutsideSeparationDepth = separationDepth;
+			minOutsideSeparation = separation;
+		}
+	}
+
+	for (let face of instance.primitive.faces) {
+		let relativeCenter = localSpherePosition.sub(face.center);
+		for (let i = 0; i < face.vertices.length; ++i) {
+			let v0 = relativeCenter.sub(face.vertices[i]);
+			let v1 = relativeCenter.sub(face.vertices[(i + 1) % face.vertices.length]);
+			let dv = v1.sub(v0);
+			let t = - v0.dot(dv) / dv.dot(dv);
+			if (t >= 0 && t <= 1) {
+				let separation = v0.add(dv.mult(t));
+				let separationDepth = separation.length();
+
+				if (separationDepth < minOutsideSeparationDepth) {
+					minOutsideSeparationDepth = separationDepth;
+					minOutsideSeparation = separation;
+				}
+			}
+		}
+	}
+
+	for (let face of instance.primitive.faces) {
+		let relativeCenter = localSpherePosition.sub(face.center);
+		for (let i = 1; i + 1 < face.vertices.length; ++i) {
+			let v0 = relativeCenter.sub(face.vertices[0]);
+			let v1 = relativeCenter.sub(face.vertices[i]);
+			let v2 = relativeCenter.sub(face.vertices[i + 1]);
+			let d1 = v1.sub(v0);
+			let d2 = v2.sub(v0);
+			let d1d1 = d1.dot(d1);
+			let d1d2 = d1.dot(d2);
+			let d2d2 = d2.dot(d2);
+			let v0d1 = v0.dot(d1);
+			let v0d2 = v0.dot(d2);
+			let det = d1d1 * d2d2 - d1d2 * d1d2;
+			let det1 = - (v0d1 * d2d2 - v0d2 * d1d2);
+			let det2 = - (v0d2 * d1d1 - v0d1 * d1d2);
+			let t1 = det1 / det;
+			let t2 = det2 / det;
+			if (t1 >= 0 && t2 >= 0 && t1 + t2 <= 1) {
+				let separation = v0.add(d1.mult(t1)).add(d2.mult(t2));
+				let separationDepth = separation.length();
+
+				if (separationDepth < minOutsideSeparationDepth) {
+					minOutsideSeparationDepth = separationDepth;
+					minOutsideSeparation = separation;
+				}
+			}
+		}
+	}
+
+	if (minOutsideSeparationDepth >= sphereRadius) {
+		return null;
+	}
+
+	return instance.rotation.rotate(minOutsideSeparation.normalized().mult(sphereRadius - minOutsideSeparationDepth));
+}
+
+// Explicitly compute the Minkowski difference of the polyhedron and the segment defining the capsule.
+// The minimal separation vector is exactly the point on the boundary of the Minkowski difference that is closest to the origin.
+function collisionCapsuleMinkowski(capsulePoint0, capsulePoint1, capsuleRadius, instance) {
+	// Work in primitive coordinate system, convert back only before return
+	let localCapsulePoint0 = instance.rotation.inverse().rotate(capsulePoint0.sub(instance.position));
+	let localCapsulePoint1 = instance.rotation.inverse().rotate(capsulePoint1.sub(instance.position));
+	let localDelta = localCapsulePoint1.sub(localCapsulePoint0);
+
+	let primitive = instance.primitive;
+
+	let diffVertices = [];
+	let activeDiffVertices = [];
+	for (let v of primitive.vertices) {
+		diffVertices.push(v.sub(localCapsulePoint0));
+		diffVertices.push(v.sub(localCapsulePoint1));
+		activeDiffVertices.push(false);
+		activeDiffVertices.push(false);
+	}
+
+	let faceSide = [];
+	for (let f of primitive.faces) {
+		faceSide.push(f.normal.dot(localDelta) >= 0);
+	}
+
+	let diffFaces = [];
+	for (let i = 0; i < primitive.faces.length; ++i) {
+		let face = primitive.faceVertices[i];
+		let diffFace = [];
+		for (let v of face) {
+			diffFace.push(2 * v + (faceSide[i] ? 0 : 1));
+		}
+		diffFaces.push(diffFace);
+	}
+
+	for (let i = 0; i < primitive.edgeFaces.length; ++i) {
+		let edgeVertices = primitive.edgeVertices[i];
+		let edgeFaces = primitive.edgeFaces[i];
+		if (faceSide[edgeFaces[0]] != faceSide[edgeFaces[1]]) {
+			let diffFace = null;
+			if (faceSide[edgeFaces[0]]) {
+				diffFace = [
+					2 * edgeVertices[0] + 1,
+					2 * edgeVertices[1] + 1,
+					2 * edgeVertices[1] + 0,
+					2 * edgeVertices[0] + 0,
+				];
+			} else {
+				diffFace = [
+					2 * edgeVertices[0] + 0,
+					2 * edgeVertices[1] + 0,
+					2 * edgeVertices[1] + 1,
+					2 * edgeVertices[0] + 1,
+				];
+			}
+			diffFaces.push(diffFace);
+		}
+	}
+
+	for (let face of diffFaces) {
+		for (let v of face) {
+			activeDiffVertices[v] = true;
+		}
+	}
+
+	let originInside = true;
+	let insideSeparation = null;
+	let maxInsideSeparationDepth = -Infinity;
+	for (let face of diffFaces) {
+		let normal = diffVertices[face[1]].sub(diffVertices[face[0]]).cross(diffVertices[face[2]].sub(diffVertices[face[0]])).normalized();
+		let depth = -diffVertices[face[0]].dot(normal);
+		if (depth >= 0) {
+			originInside = false;
+			break;
+		}
+
+		if (depth > maxInsideSeparationDepth) {
+			maxInsideSeparationDepth = depth;
+			insideSeparation = normal.mult(-depth);
+		}
+	}
+
+	if (originInside) {
+		return instance.rotation.rotate(insideSeparation.normalized().mult(capsuleRadius - maxInsideSeparationDepth));
+	}
+
+	let outsideSeparation = null;
+	let minOutsideSeparationDistance = Infinity;
+
+	for (let i = 0; i < diffVertices.length; ++i) {
+		if (!activeDiffVertices[i]) continue;
+
+		let delta = diffVertices[i].mult(-1);
+		let distance = delta.length();
+		if (distance < minOutsideSeparationDistance) {
+			minOutsideSeparationDistance = distance;
+			outsideSeparation = delta;
+		}
+	}
+
+	for (let face of diffFaces) {
+		for (let i = 0; i < face.length; ++i) {
+			let j = (i + 1) % face.length;
+			if (face[i] > face[j]) continue;
+
+			let p0 = diffVertices[face[i]];
+			let p1 = diffVertices[face[j]];
+			let dp = p1.sub(p0);
+			let t = - p0.dot(dp) / dp.dot(dp);
+
+			if (t >= 0 && t <= 1) {
+				let delta = p0.add(dp.mult(t)).mult(-1);
+				let distance = delta.length();
+				if (distance < minOutsideSeparationDistance) {
+					minOutsideSeparationDistance = distance;
+					outsideSeparation = delta;
+				}
+			}
+		}
+	}
+
+	for (let face of diffFaces) {
+		for (let i = 1; i + 1 < face.length; ++i) {
+			let p0 = diffVertices[face[0]];
+			let p1 = diffVertices[face[i]];
+			let p2 = diffVertices[face[i + 1]];
+
+			let d1 = p1.sub(p0);
+			let d2 = p2.sub(p0);
+
+			let d1d1 = d1.dot(d1);
+			let d1d2 = d1.dot(d2);
+			let d2d2 = d2.dot(d2);
+			let p0d1 = p0.dot(d1);
+			let p0d2 = p0.dot(d2);
+
+			let det = d1d1 * d2d2 - d1d2 * d1d2;
+			let det1 = - (p0d1 * d2d2 - p0d2 * d1d2);
+			let det2 = - (p0d2 * d1d1 - p0d1 * d1d2);
+
+			let t1 = det1 / det;
+			let t2 = det2 / det;
+
+			if (t1 >= 0 && t2 >= 0 && t1 + t2 <= 1) {
+				let delta = p0.add(d1.mult(t1)).add(d2.mult(t2)).mult(-1);
+				let distance = delta.length();
+				if (distance < minOutsideSeparationDistance) {
+					minOutsideSeparationDistance = distance;
+					outsideSeparation = delta;
+				}
+			}
+		}
+	}
+
+	if (minOutsideSeparationDistance < capsuleRadius) {
+		return instance.rotation.rotate(outsideSeparation.normalized().mult(capsuleRadius - minOutsideSeparationDistance));
+	}
+
+	return null;
+}
+
+
+class Player {
+	constructor() {
+		this.position = new Vector(0, 0, 0);
+		this.cameraHeight = 1.75;
+		this.cameraHeightTarget = 1.75;
+		this.cameraHeightDelta = 0.0;
+		this.cameraHeightVelocity = 0.0;
+		this.cameraBobbingPhase = 0.0;
+		this.camera = new Camera();
+		this.xAngleTarget = 0;
+		this.yAngleTarget = 0;
+		this.fovYTarget = this.camera.fovY;
+		this.velocity = new Vector(0, 0, 0);
+		this.speed = 8.0;
+		this.groundFriction = 20.0;
+		this.airFriction = 1.0;
+		this.grounded = true;
+		this.wasGrounded = true;
+		this.radius = 0.25;
+	}
+
+	save() {
+		return {
+			position: this.position.coords,
+			xangle: this.xAngleTarget,
+			yangle: this.yAngleTarget,
+			velocity: this.velocity.coords,
+		};
+	}
+
+	load(data) {
+		this.position.coords = data.position;
+		this.xAngleTarget = data.xangle;
+		this.camera.xAngle = data.xangle;
+		this.yAngleTarget = data.yangle;
+		this.camera.yAngle = data.yangle;
+		this.velocity.coords = data.velocity;
+	}
+
+	rotateX(delta) {
+		this.xAngleTarget += delta;
+	}
+
+	rotateY(delta) {
+		this.yAngleTarget += delta;
+		this.yAngleTarget = Math.min(this.yAngleTarget,  Math.PI / 2.0);
+		this.yAngleTarget = Math.max(this.yAngleTarget, -Math.PI / 2.0);
+	}
+
+	move(forward, right, fast, dt) {
+		let direction = this.camera.forwardAxisFlat().mult(forward).add(this.camera.rightAxisFlat().mult(right));
+		if (direction.length() > 0)
+			this.velocity = this.velocity.add(direction.normalized().mult(this.speed * (this.grounded ? Math.pow(2.0, fast) * this.groundFriction : 4 * this.airFriction) * dt));
+	}
+
+	jump(fast) {
+		if (this.wasGrounded) {
+			this.velocity = this.velocity.add(new Vector(0, 0, 12 + 6 * Math.max(fast, 0)));
+		}
+	}
+
+	crouch(fast) {
+		if (fast == -1) {
+			this.cameraHeightTarget = 0.75;
+		} else {
+			this.cameraHeightTarget = 1.75;
+		}
+	}
+
+	jetpack(forward, right, dt) {
+		let force = 80;
+		let direction = this.camera.forwardAxisFlat().mult(forward).add(this.camera.rightAxisFlat().mult(right)).add(new Vector(0, 0, 1));
+		this.velocity = this.velocity.add(direction.mult(force * dt));
+	}
+
+	land(newPosition) {
+		if (!this.wasGrounded) {
+			this.cameraHeightDelta += this.position.coords[2] - newPosition.coords[2];
+			this.cameraHeightVelocity += Math.min(this.velocity.coords[2], 0);
+		}
+
+		this.grounded = true;
+		this.position = newPosition;
+	}
+
+	update(dt, instances) {
+		this.wasGrounded = this.grounded;
+		this.grounded = false;
+
+		let angleFactor = -Math.expm1(- 100.0 * dt);
+		this.camera.xAngle += (this.xAngleTarget - this.camera.xAngle) * angleFactor;
+		this.camera.yAngle += (this.yAngleTarget - this.camera.yAngle) * angleFactor;
+
+		let gravity = 64;
+		this.velocity.coords[2] -= gravity * dt;
+
+		{
+			let frictionFactor = Math.exp(- (this.wasGrounded ? this.groundFriction : this.airFriction) * dt);
+			this.velocity = this.velocity.mult(frictionFactor);
+		}
+
+		let heightFactor = -Math.expm1(- 10.0 * dt);
+		this.cameraHeight += (this.cameraHeightTarget - this.cameraHeight) * heightFactor;
+
+		this.position = this.position.add(this.velocity.mult(dt));
+
+		// console.log("======== NEW FRAME ========");
+
+		for (let iteration = 0; iteration < 2; ++iteration) {
+			let collisionPoint0 = this.position.add(new Vector(0, 0, this.radius));
+			let collisionPoint1 = this.position.add(new Vector(0, 0, this.cameraHeight));
+
+			let capsuleCenter = collisionPoint0.add(collisionPoint1).mult(0.5);
+			let capsuleMaxRadius = collisionPoint1.sub(collisionPoint0).length() * 0.5 + this.radius;
+
+			let maxCollisionPenetration = -Infinity;
+			let maxCollisionNormal = null;
+
+			for (let instance of instances) {
+				if (instance.position.sub(capsuleCenter).length() >= instance.primitive.radius + capsuleMaxRadius)
+					continue;
+
+				// GJK + EPA algorithm kinda works, but it seems that there are so many corner/edge cases that need extra care
+				// that I can't be bothered to spend days fixing those :/
+				// let separation = collisionGJK_EPA(collisionPoint0, this.radius, instance); if (separation) separation = separation.mult(-1);
+
+				// let separation = collisionNaiveSphere(collisionPoint0, this.radius, instance);
+				let separation = collisionCapsuleMinkowski(collisionPoint0, collisionPoint1, this.radius, instance);
+				if (separation) {
+					let length = separation.length();
+					if (length > maxCollisionPenetration) {
+						maxCollisionPenetration = length;
+						maxCollisionNormal = separation.mult(1 / length);
+					}
+				}
+			}
+
+			if (!maxCollisionNormal)
+				break;
+
+			if (maxCollisionNormal.coords[2] > 0.5) {
+				let offset = new Vector(0, 0, maxCollisionPenetration / maxCollisionNormal.coords[2]);
+				let newPosition = this.position.add(offset);
+				this.land(newPosition);
+				this.velocity.coords[2] = Math.max(this.velocity.coords[2], 0);
+			} else {
+				let offset = maxCollisionNormal.mult(maxCollisionPenetration);
+				this.position = this.position.add(offset);
+				let dv = this.velocity.dot(maxCollisionNormal);
+				if (dv < 0) this.velocity = this.velocity.sub(maxCollisionNormal.mult(dv));
+			}
+		}
+
+		if (this.position.coords[2] <= 0) {
+			this.land(new Vector(this.position.coords[0], this.position.coords[1], 0));
+			this.velocity.coords[2] = Math.max(this.velocity.coords[2], 0);
+		}
+
+		this.camera.position = this.position
+			.add(new Vector(0, 0, this.cameraHeight + this.cameraHeightDelta))
+			;
+
+		this.cameraHeightVelocity -= (100.0 * this.cameraHeightDelta + 20.0 * this.cameraHeightVelocity) * Math.min(0.05, dt);
+		this.cameraHeightDelta += this.cameraHeightVelocity * Math.min(0.05, dt);
+
+		this.camera.fovY += (this.fovYTarget - this.camera.fovY) * (- Math.expm1(- 4 * dt));
+	}
+}
+
+class PrimitiveFace {
+	constructor(center, vertices, normal) {
+		this.center = center;
+		this.vertices = vertices;
+		this.normal = normal;
+	}
+}
+
+class PrimitiveMeshVertex {
+	constructor(position, normal, edge) {
+		this.position = position;
+		this.normal = normal;
+		this.edge = edge;
+	}
+}
+
+class Primitive {
+	constructor(name) {
+		this.name = name;
+		this.faces = [];
+		this.vertices = [];
+		this.edgeVertices = [];
+		this.faceVertices = [];
+		this.edgeFaces = [];
+		this.vertexFaces = [];
+		this.uniqueFaces = new Map();
+		this.bbox = AABB.empty(3);
+		this.radius = 0;
+		this.mesh = null;
+	}
+}
+
+class PrimitiveInstance {
+	constructor(primitive, position, rotation) {
+		this.primitive = primitive;
+		this.position = position;
+		this.rotation = rotation;
+		this.createdAt = new Date();
+	}
+}
+
+class PolyhedraFrame extends Frame {
+	constructor(canvas) {
+		super(canvas);
+
+		let gl = this.gl;
+
+		this.anisotropyExt = gl.getExtension('EXT_texture_filter_anisotropic');
+
+		this.player = new Player();
+
+		this.locked = false;
+
+		this.crosshairSize = 32;
+		this.toolbarItemSize = 64;
+		this.toolbarSelectionSize = 68;
+
+		this.loadPrograms();
+		this.loadMeshes();
+		this.loadTextures();
+		this.loadPrimitives();
+
+		this.toolbar = new Array(this.primitives.length + 1);
+		this.attachmentTypeSettings = new Array(this.primitives.length);
+		for (let i = 0; i + 1 < this.toolbar.length; ++i) {
+			this.toolbar[i] = this.primitives[i];
+			this.attachmentTypeSettings[i] = new Map();
+		}
+		this.toolbar[this.toolbar.length - 1] = "remove";
+		this.toolbarRotation = new Array(this.toolbar.length).fill(0);
+		this.selectedToolbarIndex = 0;
+		this.selectedToolbarIndexSmooth = 0;
+
+		this.attachmentType = 0;
+		this.placementPosition = null;
+		this.placementRotation = null;
+
+		this.placementIsGround = false;
+		this.placementIsValid = false;
+
+		this.placementGhostScale = 1;
+		this.placementGhostScaleVelocity = 0;
+
+		this.intersectionInstance = null;
+		this.removalInstance = null;
+
+		this.instances = [];
+		this.destroyingInstances = [];
+
+		let playerData = window.localStorage.getItem("player");
+		if (playerData) {
+			this.player.load(JSON.parse(playerData));
+		}
+
+		this.loadInstances();
+	}
+
+	findPrimitive(name) {
+		for (let primitive of this.primitives) {
+			if (primitive.name == name) {
+				return primitive;
+			}
+		}
+		return null;
+	}
+
+	saveInstances() {
+		let data = [];
+		for (let instance of this.instances) {
+			data.push({
+				primitive: instance.primitive.name,
+				position: instance.position.coords,
+				rotation: instance.rotation.coords,
+			});
+		}
+
+		window.localStorage.setItem("instances", JSON.stringify(data));
+	}
+
+	loadInstances() {
+		let data = window.localStorage.getItem("instances");
+		if (data) {
+			for (let instance of JSON.parse(data)) {
+				let primitive = this.findPrimitive(instance.primitive);
+				let position = new Vector(...instance.position);
+				let rotation = new Quaternion(...instance.rotation);
+				this.instances.push(new PrimitiveInstance(primitive, position, rotation));
+			}
+		}
+	}
+
+	loadPrograms() {
+		this.skyProgram = this.loadProgram('sky');
+		this.groundProgram = this.loadProgram('ground');
+		this.primitiveProgram = this.loadProgram('primitive');
+		this.imageProgram = this.loadProgram('image');
+	}
+
+	loadMeshes() {
+		this.createGroundMesh();
+	}
+
+	createGroundMesh() {
+		let gl = this.gl;
+
+		let vertices = [
+			 0,  0, 0, 1,
+			 1,  0, 0, 0,
+			 0,  1, 0, 0,
+			-1,  0, 0, 0,
+			 0, -1, 0, 0,
+		];
+
+		let indices = [
+			0, 1, 2,
+			0, 2, 3,
+			0, 3, 4,
+			0, 4, 1,
+		];
+
+		let vertexArray = gl.createVertexArray();
+		gl.bindVertexArray(vertexArray);
+		let vertexBuffer = this.loadBuffer(new Float32Array(vertices), gl.ARRAY_BUFFER);
+		gl.enableVertexAttribArray(0);
+		gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+		let indexBuffer = this.loadBuffer(new Int32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+
+		this.groundMesh = new Mesh(gl, vertexArray, vertexBuffer, indexBuffer, indices.length);
+	}
+
+	loadTextures() {
+		this.createGridTexture();
+		this.createEdgeTexture();
+		this.createThickEdgeTexture();
+		this.createCrosshairTexture();
+		this.createToolbarItemTexture();
+		this.createToolbarSelectionTexture();
+		this.createToolbarRemoveTexture();
+	}
+
+	createGridTexture() {
+		let textureSize = 256;
+		let pixels = new Uint32Array(textureSize * textureSize);
+		for (let y = 0; y < textureSize; ++y) {
+			for (let x = 0; x < textureSize; ++x) {
+				let d = Math.min(
+					Math.min(x, textureSize - x - 1),
+					Math.min(y, textureSize - y - 1)
+				);
+
+				let value = 0xff303030;
+
+				if ((x % 16) == 0 || ((x % 16) == 15) || ((y % 16) == 0) || ((y % 16) == 15)) {
+					value = 0xff373737;
+				}
+
+				if (d < 1) {
+					value = 0xff707070;
+				}
+
+				pixels[y * textureSize + x] = value;
+			}
+		}
+
+		let gl = this.gl;
+		this.gridTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.gridTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		if (this.anisotropyExt != null) {
+			gl.texParameterf(gl.TEXTURE_2D, this.anisotropyExt.TEXTURE_MAX_ANISOTROPY_EXT, gl.getParameter(this.anisotropyExt.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+		}
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createEdgeTexture() {
+		let textureSize = 256;
+		let pixels = new Uint8Array(textureSize);
+		for (let x = 0; x < textureSize; ++x) {
+			let value = 0;
+			if (x < 4) value = 127;
+			pixels[x] = value;
+		}
+
+		let gl = this.gl;
+		this.edgeTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.edgeTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, textureSize, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		if (this.anisotropyExt != null) {
+			gl.texParameterf(gl.TEXTURE_2D, this.anisotropyExt.TEXTURE_MAX_ANISOTROPY_EXT, gl.getParameter(this.anisotropyExt.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+		}
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createThickEdgeTexture() {
+		let textureSize = 256;
+		let pixels = new Uint8Array(textureSize);
+		for (let x = 0; x < textureSize; ++x) {
+			let value = 0;
+			if (x < 12) value = 191;
+			pixels[x] = value;
+		}
+
+		let gl = this.gl;
+		this.thickEdgeTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.thickEdgeTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, textureSize, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		if (this.anisotropyExt != null) {
+			gl.texParameterf(gl.TEXTURE_2D, this.anisotropyExt.TEXTURE_MAX_ANISOTROPY_EXT, gl.getParameter(this.anisotropyExt.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+		}
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createCrosshairTexture() {
+		let textureSize = this.crosshairSize;
+		let pixels = new Uint32Array(textureSize * textureSize);
+		for (let y = 0; y < textureSize; ++y) {
+			for (let x = 0; x < textureSize; ++x) {
+				let d = Math.min(
+					Math.abs(x + 0.5 - textureSize / 2),
+					Math.abs(y + 0.5 - textureSize / 2)
+				);
+
+				let value = 0x00000000;
+
+				if (d < 1) {
+					value = 0x7f7f7f7f;
+				}
+
+				pixels[y * textureSize + x] = value;
+			}
+		}
+
+		let gl = this.gl;
+		this.crosshairTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.crosshairTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createToolbarItemTexture() {
+		let textureSize = this.toolbarItemSize;
+		let pixels = new Uint32Array(textureSize * textureSize);
+		for (let y = 0; y < textureSize; ++y) {
+			for (let x = 0; x < textureSize; ++x) {
+				let d = Math.min(
+					Math.min(x, textureSize - x - 1),
+					Math.min(y, textureSize - y - 1)
+				);
+
+				let value = 0x3f000000;
+
+				if (d <= 1) {
+					value = 0xffbfbfbf;
+				} else if (d == 2) {
+					value = 0x7f000000;
+				} else if (d == 3) {
+					value = 0x6f000000;
+				} else if (d == 4) {
+					value = 0x5f000000;
+				} else if (d == 5) {
+					value = 0x4f000000;
+				}
+
+				pixels[y * textureSize + x] = value;
+			}
+		}
+
+		let gl = this.gl;
+		this.toolbarItemTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.toolbarItemTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createToolbarSelectionTexture() {
+		let textureSize = this.toolbarSelectionSize;
+		let pixels = new Uint32Array(textureSize * textureSize);
+		for (let y = 0; y < textureSize; ++y) {
+			for (let x = 0; x < textureSize; ++x) {
+				let d = Math.min(
+					Math.min(x, textureSize - x - 1),
+					Math.min(y, textureSize - y - 1)
+				);
+
+				let value = 0x00000000;
+
+				if (d < 4) {
+					value = 0xffbfbfbf;
+				}
+
+				pixels[y * textureSize + x] = value;
+			}
+		}
+
+		let gl = this.gl;
+		this.toolbarSelectionTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.toolbarSelectionTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	createToolbarRemoveTexture() {
+		let textureSize = this.toolbarItemSize;
+		let pixels = new Uint32Array(textureSize * textureSize);
+		for (let y = 0; y < textureSize; ++y) {
+			for (let x = 0; x < textureSize; ++x) {
+				let d = Math.min(
+					Math.abs(x - y),
+					Math.abs(x + y - (textureSize - 1)),
+				);
+
+				let s = Math.max(
+					Math.abs(x - (textureSize-1) / 2),
+					Math.abs(y - (textureSize-1) / 2),
+				);
+
+				let value = 0x00000000;
+
+				if (d < 4 && s < textureSize * 0.3125) {
+					value = 0xffffffff;
+				}
+
+				pixels[y * textureSize + x] = value;
+			}
+		}
+
+		let gl = this.gl;
+		this.toolbarRemoveTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, this.toolbarRemoveTexture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels.buffer));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
+	loadPrimitives() {
+		this.primitives = [];
+
+		let processedVertexCount = 0;
+
+		let primitivesData = document.getElementById("primitives").innerText;
+		for (let line of primitivesData.split("\n")) {
+			line = line.trim();
+			if (line.length == 0) continue;
+			if (line[0] == '#') continue;
+
+			let tokens = line.split(' ');
+
+			if (tokens[0] == 'o') {
+				if (this.primitives.length > 0)
+					processedVertexCount += this.primitives.at(-1).vertices.length;
+				let name = tokens[1].replace('_', ' ');
+				this.primitives.push(new Primitive(name));
+			} else if (tokens[0] == 'v') {
+				this.primitives.at(-1).vertices.push(new Vector(Number(tokens[1]), Number(tokens[2]), Number(tokens[3])));
+			} else if (tokens[0] == 'f') {
+				let currentPrimitive = this.primitives.at(-1);
+
+				let face = [];
+				for (let i = 1; i < tokens.length; ++i) {
+					face.push(Number(tokens[i]) - processedVertexCount - 1);
+				}
+
+				currentPrimitive.faceVertices.push(face);
+			}
+		}
+
+		// Restore primitive topology (vertex/edge/face connectivity)
+		for (let primitive of this.primitives) {
+			let edgeIndex = new Map();
+
+			for (let v of primitive.vertices) {
+				primitive.vertexFaces.push([]);
+			}
+
+			for (let k = 0; k < primitive.faceVertices.length; ++k) {
+				let face = primitive.faceVertices[k];
+				for (let i = 0; i < face.length; ++i) {
+					primitive.vertexFaces[face[i]].push(k);
+
+					let j = (i + 1) % face.length;
+
+					let edge = [face[i], face[j]];
+					let faceIndexInEdge = 0;
+					if (edge[0] > edge[1]) {
+						edge = [edge[1], edge[0]];
+						faceIndexInEdge = 1;
+					}
+
+					let edgeKey = edge[0] + edge[1] * 256;
+					if (!edgeIndex.has(edgeKey)) {
+						edgeIndex.set(edgeKey, primitive.edgeVertices.length);
+						primitive.edgeVertices.push([edge[0], edge[1]]);
+						primitive.edgeFaces.push([null, null]);
+					}
+					primitive.edgeFaces[edgeIndex.get(edgeKey)][faceIndexInEdge] = k;
+				}
+			}
+
+			// Find unique faces, i.e. faces with unique neighbourhoods
+			let uniqueFaceKeys = new Map();
+			for (let k = 0; k < primitive.faceVertices.length; ++k) {
+				let face = primitive.faceVertices[k];
+
+				let key = [];
+				let min = Infinity;
+				let max = -Infinity;
+				for (let i = 0; i < face.length; ++i) {
+					let j = (i + 1) % face.length;
+
+					let edge = [face[i], face[j]];
+					let faceIndexInEdge = 0;
+					if (edge[0] > edge[1]) {
+						edge = [edge[1], edge[0]];
+						faceIndexInEdge = 1;
+					}
+					let edgeKey = edge[0] + edge[1] * 256;
+
+					let otherFace = primitive.edgeFaces[edgeIndex.get(edgeKey)][1 - faceIndexInEdge];
+					let value = primitive.faceVertices[otherFace].length;
+					key.push(value);
+					min = Math.min(min, value);
+					max = Math.max(max, value);
+				}
+
+				if (min < max) {
+					while (key[0] != min || key.at(-1) == min) {
+						key = key.slice(1).concat(key.slice(0, 1));
+					}
+				}
+
+				if (!uniqueFaceKeys.has(face.length)) {
+					uniqueFaceKeys.set(face.length, [key]);
+					primitive.uniqueFaces.set(face.length, [{index: k, noRotation: min == max}]);
+				} else {
+					let unique = true;
+					for (let otherKey of uniqueFaceKeys.get(face.length)) {
+						let equal = true;
+						for (let i = 0; i < key.length; ++i) {
+							if (key[i] != otherKey[i]) {
+								equal = false;
+								break;
+							}
+						}
+						if (equal) {
+							unique = false;
+							break;
+						}
+					}
+
+					if (unique) {
+						uniqueFaceKeys.get(face.length).push(key);
+						primitive.uniqueFaces.get(face.length).push({index: k, noRotation: min == max});
+					}
+				}
+			}
+		}
+
+
+		let gl = this.gl;
+
+		let primitiveScale = 1;
+
+		// Center all primitives, compute bboxes, and generate meshes
+		for (let primitive of this.primitives) {
+			let primitiveCenter = new Vector(0, 0, 0);
+			for (let vertex of primitive.vertices) {
+				primitiveCenter = primitiveCenter.add(vertex);
+			}
+			primitiveCenter = primitiveCenter.mult(1 / primitive.vertices.length);
+			for (let i in primitive.vertices) {
+				primitive.vertices[i] = primitive.vertices[i].sub(primitiveCenter).mult(primitiveScale);
+			}
+
+			let radius = 0;
+			for (let vertex of primitive.vertices) {
+				primitive.bbox.extend(vertex);
+				radius = Math.max(radius, vertex.length());
+			}
+			primitive.radius = radius;
+
+			let meshVertices = [];
+			let meshIndices = [];
+
+			for (let face of primitive.faceVertices) {
+				let faceCenter = new Vector(0, 0, 0);
+				for (let vertex of face) {
+					faceCenter = faceCenter.add(primitive.vertices[vertex]);
+				}
+				faceCenter = faceCenter.mult(1 / face.length);
+
+				let relativeVertices = [];
+				for (let vertex of face) {
+					relativeVertices.push(primitive.vertices[vertex].sub(faceCenter));
+				}
+
+				let faceNormal = primitive.vertices[face[1]].sub(primitive.vertices[face[0]]).cross(primitive.vertices[face[2]].sub(primitive.vertices[face[0]])).normalized();
+
+				primitive.faces.push(new PrimitiveFace(faceCenter, relativeVertices, faceNormal));
+
+				let baseIndex = meshVertices.length;
+
+				meshVertices.push(new PrimitiveMeshVertex(faceCenter, faceNormal, faceCenter.sub(primitive.vertices[face[0]].add(primitive.vertices[face[1]]).mult(0.5)).length()));
+				for (let i = 0; i < face.length; ++i) {
+					meshVertices.push(new PrimitiveMeshVertex(primitive.vertices[face[i]], faceNormal, 0));
+				}
+
+				for (let i = 0; i < face.length; ++i) {
+					meshIndices.push(baseIndex);
+					meshIndices.push(baseIndex + 1 + i);
+					meshIndices.push(baseIndex + 1 + ((i + 1) % face.length));
+				}
+			}
+
+			let meshVertexData = [];
+			for (let vertex of meshVertices) {
+				meshVertexData.push(vertex.position.coords[0]);
+				meshVertexData.push(vertex.position.coords[1]);
+				meshVertexData.push(vertex.position.coords[2]);
+				meshVertexData.push(vertex.edge);
+				meshVertexData.push(vertex.normal.coords[0]);
+				meshVertexData.push(vertex.normal.coords[1]);
+				meshVertexData.push(vertex.normal.coords[2]);
+				meshVertexData.push(0);
+			}
+
+			let vertexArray = gl.createVertexArray();
+			gl.bindVertexArray(vertexArray);
+			let vertexBuffer = this.loadBuffer(new Float32Array(meshVertexData), gl.ARRAY_BUFFER);
+			gl.enableVertexAttribArray(0);
+			gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+			gl.enableVertexAttribArray(1);
+			gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 32, 12);
+			gl.enableVertexAttribArray(2);
+			gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 32, 16);
+			let indexBuffer = this.loadBuffer(new Int32Array(meshIndices), gl.ELEMENT_ARRAY_BUFFER);
+
+			primitive.mesh = new Mesh(gl, vertexArray, vertexBuffer, indexBuffer, meshIndices.length);
+		}
+
+		// Sort primitives by vertex count
+		// TODO: sort by volume
+		this.primitives.sort((x, y) => x.vertices.length - y.vertices.length);
+	}
+
+	onResize() {
+		super.onResize();
+		this.player.camera.resize(this.canvas.width, this.canvas.height);
+
+		if (this.canvas.width < 900) {
+			if (this.toolbarItemSize != 32) {
+				this.toolbarItemSize = 32;
+				this.toolbarSelectionSize = 34;
+				this.createToolbarItemTexture();
+				this.createToolbarRemoveTexture();
+				this.createToolbarSelectionTexture();
+			}
+		} else if (this.canvas.width < 1200) {
+			if (this.toolbarItemSize != 48) {
+				this.toolbarItemSize = 48;
+				this.toolbarSelectionSize = 46;
+				this.createToolbarItemTexture();
+				this.createToolbarRemoveTexture();
+				this.createToolbarSelectionTexture();
+			}
+		} else {
+			if (this.toolbarItemSize != 64) {
+				this.toolbarItemSize = 64;
+				this.toolbarSelectionSize = 68;
+				this.createToolbarItemTexture();
+				this.createToolbarRemoveTexture();
+				this.createToolbarSelectionTexture();
+			}
+		}
+	}
+
+	onMouseDown(event) {
+		super.onMouseDown(event);
+
+		let needSaveInstances = false;
+
+		if (event.button == 0 && this.locked) {
+			let selection = this.toolbar[this.selectedToolbarIndex];
+
+			if ((selection instanceof Primitive) && this.placementPosition) {
+				if (this.placementIsValid) {
+					this.instances.push(new PrimitiveInstance(selection, this.placementPosition, this.placementRotation));
+					needSaveInstances = true;
+				} else {
+					this.placementGhostScaleVelocity -= 20;
+				}
+			}
+
+			if (selection == "remove" && this.removalInstance) {
+				let index = this.instances.indexOf(this.removalInstance);
+				if (index >= 0) {
+					this.instances.splice(index, 1);
+					this.destroyingInstances.push(this.removalInstance);
+					this.removalInstance.destroyedAt = new Date();
+					needSaveInstances = true;
+				}
+			}
+		}
+
+		if (event.button == 1 && this.locked) {
+			if (this.intersectionInstance) {
+				for (let i = 0; i < this.toolbar.length; ++i) {
+					if (this.toolbar[i] == this.intersectionInstance.primitive) {
+						this.selectedToolbarIndex = i;
+						break;
+					}
+				}
+			}
+		}
+
+		if (needSaveInstances)
+			this.saveInstances();
+	}
+
+	onMouseWheel(event) {
+		super.onMouseWheel(event);
+
+		if (this.locked) {
+			if (event.deltaY < 0) {
+				this.moveToolbarSelection(this.selectedToolbarIndex - 1);
+			}
+			if (event.deltaY > 0) {
+				this.moveToolbarSelection(this.selectedToolbarIndex + 1);
+			}
+		}
+	}
+
+	onKeyDown(event) {
+		super.onKeyDown(event);
+
+		if (this.locked) {
+			if (event.code.startsWith('Digit')) {
+				let index = Number(event.code[5]) - 1;
+				this.moveToolbarSelection(index >= 0 ? index : 9);
+			}
+			if (event.code == 'KeyX') {
+				this.moveToolbarSelection(this.toolbar.length - 1);
+			}
+			if (event.code == 'KeyR') {
+				let selection = this.toolbar[this.selectedToolbarIndex];
+				if (this.attachmentType != 0 && selection instanceof Primitive && selection.uniqueFaces.has(this.attachmentType)) {
+					let uniqueFaces = selection.uniqueFaces.get(this.attachmentType);
+					if (!this.attachmentTypeSettings[this.selectedToolbarIndex].has(this.attachmentType)) {
+						this.attachmentTypeSettings[this.selectedToolbarIndex].set(this.attachmentType, {face: 0, rotation: 0});
+					}
+
+					let settings = this.attachmentTypeSettings[this.selectedToolbarIndex].get(this.attachmentType);
+					settings.rotation += 1;
+					if (settings.rotation >= this.attachmentType || uniqueFaces[settings.face].noRotation) {
+						settings.rotation = 0;
+						settings.face += 1;
+						if (settings.face >= uniqueFaces.length) {
+							settings.face = 0;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	moveToolbarSelection(value) {
+		this.selectedToolbarIndex = value;
+		if (this.selectedToolbarIndex < 0)
+			this.selectedToolbarIndex += this.toolbar.length;
+		if (this.selectedToolbarIndex >= this.toolbar.length)
+			this.selectedToolbarIndex -= this.toolbar.length;
+	}
+
+	onMouseMove(event) {
+		if (this.locked) {
+			let delta = new Vector(event.movementX || (event.clientX - this.mouse.coords[0]), event.movementY || (event.clientY - this.mouse.coords[1]));
+			this.player.rotateX(- delta.coords[0] / 400.0);
+			this.player.rotateY(- delta.coords[1] / 400.0);
+		}
+	}
+
+	update(dt) {
+		let movement = [0, 0, 0];
+		let jetpack = false;
+
+		if (this.locked) {
+			if (this.keyDown.has('KeyW')) movement[0] += 1;
+			if (this.keyDown.has('KeyS')) movement[0] -= 1;
+			if (this.keyDown.has('KeyD')) movement[1] += 1;
+			if (this.keyDown.has('KeyA')) movement[1] -= 1;
+			if (this.keyDown.has('ShiftLeft')) movement[2] = 1;
+			if (this.keyDown.has('KeyC')) movement[2] = -1;
+			if (this.keyDown.has('Space')) this.player.jump(movement[2]);
+			if (this.keyDown.has('KeyF')) jetpack = true;
+
+			if (movement[2] == 1) {
+				this.player.fovYTarget = Math.PI * 0.7;
+			} else {
+				this.player.fovYTarget = Math.PI * 0.5;
+			}
+		}
+		if (jetpack) {
+			this.player.jetpack(movement[0], movement[1], dt);
+		} else {
+			this.player.move(movement[0], movement[1], movement[2], dt);
+			this.player.crouch(movement[2]);
+		}
+		this.player.update(dt, this.instances);
+
+		this.placementPosition = null;
+		this.placementRotation = null;
+		this.placementIsGround = false;
+		this.placementIsValid = false;
+		this.intersectionInstance = null;
+		this.removalInstance = null;
+		this.attachmentType = 0;
+		if (this.locked) {
+			let cameraRay = this.player.camera.forwardRay();
+			let closestIntersection = Infinity;
+			let intersectionFace = null;
+
+			for (let instance of this.instances) {
+				for (let face of instance.primitive.faces) {
+					let p0 = instance.position.add(instance.rotation.rotate(face.center));
+					for (let i = 0; i < face.vertices.length; ++i) {
+						let p1 = p0.add(instance.rotation.rotate(face.vertices[i]));
+						let p2 = p0.add(instance.rotation.rotate(face.vertices[(i + 1) % face.vertices.length]));
+						let intersection = cameraRay.intersectTriangle(p0, p1, p2);
+						if (intersection != null && intersection < closestIntersection) {
+							closestIntersection = intersection;
+							this.intersectionInstance = instance;
+							intersectionFace = face;
+							break;
+						}
+					}
+				}
+			}
+
+			let selection = this.toolbar[this.selectedToolbarIndex];
+
+			if (selection instanceof Primitive) {
+				if (this.intersectionInstance) {
+					this.attachmentType = intersectionFace.vertices.length;
+					if (!this.attachmentTypeSettings[this.selectedToolbarIndex].has(this.attachmentType)) {
+						this.attachmentTypeSettings[this.selectedToolbarIndex].set(this.attachmentType, {face: 0, rotation: 0});
+					}
+					let attachmentSettings = this.attachmentTypeSettings[this.selectedToolbarIndex].get(this.attachmentType);
+
+					let attachmentFace = null;
+					if (selection.uniqueFaces.has(this.attachmentType)) {
+						attachmentFace = selection.faces[selection.uniqueFaces.get(this.attachmentType)[attachmentSettings.face].index];
+						this.placementIsValid = true;
+					} else {
+						attachmentFace = selection.faces[0];
+
+					}
+
+					let targetNormal = this.intersectionInstance.rotation.rotate(intersectionFace.normal.mult(-1));
+					this.placementRotation = Quaternion.fromTo(attachmentFace.normal, targetNormal);
+
+					let targetTangent = this.intersectionInstance.rotation.rotate(intersectionFace.vertices[0]).normalized();
+					let currentTangent = this.placementRotation.rotate(attachmentFace.vertices[attachmentSettings.rotation]).normalized();
+					this.placementRotation = Quaternion.fromTo(currentTangent, targetTangent, targetNormal).mult(this.placementRotation);
+
+					this.placementPosition = this.intersectionInstance.position.add(this.intersectionInstance.rotation.rotate(intersectionFace.center)).sub(this.placementRotation.rotate(attachmentFace.center));
+				}
+
+				let groundIntersection = cameraRay.intersectPlane(new Vector(0, 0, 1), 0);
+				if (groundIntersection != null && groundIntersection < closestIntersection) {
+					closestIntersection = groundIntersection;
+					this.placementPosition = cameraRay.get(groundIntersection).add(new Vector(0, 0, - selection.bbox.min.coords[2]));
+					this.placementRotation = Quaternion.axisAngle(new Vector(0, 0, 1), this.player.camera.xAngle);
+					this.placementIsGround = true;
+					this.placementIsValid = true;
+					this.intersectionInstance = null;
+				}
+			} else if (selection == "remove") {
+				this.removalInstance = this.intersectionInstance;
+			}
+		}
+
+		this.placementGhostScaleVelocity -= (400.0 * (this.placementGhostScale - 1) + 40.0 * this.placementGhostScaleVelocity) * dt;
+		this.placementGhostScale += dt * this.placementGhostScaleVelocity;
+
+		this.selectedToolbarIndexSmooth += (this.selectedToolbarIndex - this.selectedToolbarIndexSmooth) * (- Math.expm1(- 25 * dt));
+
+		this.toolbarRotation[this.selectedToolbarIndex] += 2 * dt;
+
+		let now = new Date();
+
+		let newDestroyingInstances = [];
+		for (let instance of this.destroyingInstances) {
+			if (now - instance.destroyedAt < 125) {
+				newDestroyingInstances.push(instance);
+			}
+		}
+		this.destroyingInstances = newDestroyingInstances;
+
+		window.localStorage.setItem("player", JSON.stringify(this.player.save()));
+	}
+
+	draw () {
+		let gl = this.gl;
+		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+		gl.clearColor(0, 0, 0, 0);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		let cameraViewMatrix = this.player.camera.viewMatrix();
+		let cameraProjectionMatrix = this.player.camera.projectionMatrix();
+		let cameraMatrix = cameraProjectionMatrix.mult(cameraViewMatrix);
+		let inverseCameraMatrix = cameraMatrix.inverse();
+
+		gl.disable(gl.DEPTH_TEST);
+
+		gl.useProgram(this.skyProgram);
+		this.skyProgram.inverseCameraMatrix = inverseCameraMatrix;
+		this.skyProgram.cameraPosition = this.player.camera.position;
+		gl.enableVertexAttribArray(0);
+		gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+		gl.enable(gl.DEPTH_TEST);
+		gl.depthFunc(gl.LESS);
+		gl.disable(gl.CULL_FACE);
+		gl.disable(gl.BLEND);
+
+		gl.useProgram(this.groundProgram);
+		this.groundProgram.cameraMatrix = cameraMatrix;
+		gl.bindTexture(gl.TEXTURE_2D, this.gridTexture);
+		this.groundMesh.draw();
+
+		gl.bindTexture(gl.TEXTURE_2D, this.edgeTexture);
+
+		gl.disable(gl.CULL_FACE);
+		gl.cullFace(gl.BACK);
+		gl.useProgram(this.primitiveProgram);
+		this.primitiveProgram.cameraMatrix = cameraMatrix;
+
+		let now = new Date();
+
+		for (let instance of this.instances) {
+			let time = (now - instance.createdAt) / 1000.0;
+			let animationTime = 0.125;
+			let animationAmplitude = -1;
+			let scale = 1;
+			if (time < animationTime) {
+				let t = time / animationTime;
+				scale = animationAmplitude * t * (t - 1) * (t - 1) + 1;
+			}
+
+			this.primitiveProgram.instanceOffset = instance.position;
+			this.primitiveProgram.instanceScale = scale;
+			this.primitiveProgram.instanceRotation = instance.rotation;
+			this.primitiveProgram.albedo = new Vector(1, 1, 1, 1);
+			this.primitiveProgram.edgeAlbedo = new Vector(0, 0, 0, 1);
+			this.primitiveProgram.emission = new Vector(0, 0, 0, 0);
+			this.primitiveProgram.edgeEmission = new Vector(0, 0, 0, 0);
+			instance.primitive.mesh.draw();
+		}
+
+		for (let instance of this.destroyingInstances) {
+			let time = (now - instance.destroyedAt) / 1000.0;
+			let animationTime = 0.125;
+			let animationAmplitude = 2;
+			let scale = 0;
+			if (time < animationTime) {
+				let t = time / animationTime;
+				scale = animationAmplitude * (2 * t * t * t - 4 * t * t + 2 * t) + (1 - t);
+			}
+
+			this.primitiveProgram.instanceOffset = instance.position;
+			this.primitiveProgram.instanceScale = scale;
+			this.primitiveProgram.instanceRotation = instance.rotation;
+			this.primitiveProgram.albedo = new Vector(1, 1, 1, 1);
+			this.primitiveProgram.edgeAlbedo = new Vector(0, 0, 0, 1);
+			this.primitiveProgram.emission = new Vector(0, 0, 0, 0);
+			this.primitiveProgram.edgeEmission = new Vector(0, 0, 0, 0);
+			instance.primitive.mesh.draw();
+		}
+
+		gl.enable(gl.BLEND);
+		gl.blendEquation(gl.FUNC_ADD);
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+		let selection = this.toolbar[this.selectedToolbarIndex];
+		if ((this.placementPosition && selection instanceof Primitive) || this.removalInstance) {
+			let primitive;
+			if (this.placementPosition) {
+				this.primitiveProgram.instanceOffset = this.placementPosition;
+				this.primitiveProgram.instanceRotation = this.placementRotation;
+				this.primitiveProgram.instanceScale = 0.99 * this.placementGhostScale;
+				primitive = selection;
+			}
+
+			if (this.removalInstance) {
+				this.primitiveProgram.instanceOffset = this.removalInstance.position;
+				this.primitiveProgram.instanceRotation = this.removalInstance.rotation;
+				this.primitiveProgram.instanceScale = 1.01;
+				primitive = this.removalInstance.primitive;
+			}
+
+			gl.enable(gl.CULL_FACE);
+			gl.depthMask(false);
+
+			gl.depthFunc(gl.GEQUAL);
+
+			this.primitiveProgram.albedo = new Vector(0, 0, 0, 0);
+			this.primitiveProgram.edgeAlbedo = new Vector(0, 0, 0, 0);
+			if (this.placementIsGround) {
+				this.primitiveProgram.emission = new Vector(0.1, 0.4, 0.1, 1 / 256);
+				this.primitiveProgram.edgeEmission = new Vector(0.6, 0.8, 0.6, 1 / 256);
+			} else if (this.placementIsValid) {
+				this.primitiveProgram.emission = new Vector(0.1, 0.2, 0.4, 1 / 256);
+				this.primitiveProgram.edgeEmission = new Vector(0.6, 0.7, 0.8, 1 / 256);
+			} else if (this.removalInstance) {
+				this.primitiveProgram.emission = new Vector(0.4, 0.1, 0.1, 1 / 256);
+				this.primitiveProgram.edgeEmission = new Vector(0.8, 0.6, 0.6, 1 / 256);
+			} else {
+				this.primitiveProgram.emission = new Vector(0.4, 0.1, 0.1, 1 / 256);
+				this.primitiveProgram.edgeEmission = new Vector(0.8, 0.6, 0.6, 1 / 256);
+			}
+
+			gl.cullFace(gl.FRONT);
+			primitive.mesh.draw();
+			gl.cullFace(gl.BACK);
+			primitive.mesh.draw();
+
+			gl.depthFunc(gl.LESS);
+
+			this.primitiveProgram.albedo = new Vector(0, 0, 0, 1 / 4);
+			this.primitiveProgram.edgeAlbedo = new Vector(0, 0, 0, 1 / 4);
+			if (this.placementIsGround) {
+				this.primitiveProgram.emission = new Vector(0.1, 0.4, 0.1, 1 / 16);
+				this.primitiveProgram.edgeEmission = new Vector(0.6, 0.8, 0.6, 1 / 4);
+			} else if (this.placementIsValid) {
+				this.primitiveProgram.emission = new Vector(0.1, 0.2, 0.4, 1 / 16);
+				this.primitiveProgram.edgeEmission = new Vector(0.6, 0.7, 0.8, 1 / 4);
+			} else if (this.removalInstance) {
+				this.primitiveProgram.emission = new Vector(0.4, 0.0, 0.0, 1 / 16);
+				this.primitiveProgram.edgeEmission = new Vector(0.8, 0.6, 0.6, 1 / 4);
+			} else {
+				this.primitiveProgram.emission = new Vector(0.4, 0.1, 0.1, 1 / 16);
+				this.primitiveProgram.edgeEmission = new Vector(0.8, 0.6, 0.6, 1 / 4);
+			}
+
+			gl.cullFace(gl.FRONT);
+			primitive.mesh.draw();
+			gl.cullFace(gl.BACK);
+			primitive.mesh.draw();
+
+			gl.depthMask(true);
+		}
+
+		gl.disable(gl.DEPTH_TEST);
+
+		gl.useProgram(this.imageProgram);
+
+		if (this.locked) {
+			this.imageProgram.imageCenter = new Vector(0, 0);
+			this.imageProgram.imageSize = new Vector(this.crosshairSize / this.canvas.width, this.crosshairSize / this.canvas.height);
+			this.imageProgram.imageColor = new Vector(1, 1, 1, 1);
+			gl.bindTexture(gl.TEXTURE_2D, this.crosshairTexture);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+		}
+
+		let toolbarItemStep = this.toolbarItemSize - 1;
+		let toolbarCenterY = this.canvas.height - 1 * this.toolbarItemSize;
+		let toolbarLeft = Math.floor(this.canvas.width / 2 - this.toolbar.length * toolbarItemStep / 2);
+		let imageSize = new Vector(this.toolbarItemSize / this.canvas.width, this.toolbarItemSize / this.canvas.height);
+		this.imageProgram.imageCenter = new Vector(0, 0);
+		this.imageProgram.imageSize = imageSize;
+		this.imageProgram.imageColor = new Vector(1, 1, 1, 1);
+		gl.bindTexture(gl.TEXTURE_2D, this.toolbarItemTexture);
+		for (let i = 0; i < this.toolbar.length; ++i) {
+			let x = toolbarLeft + i * toolbarItemStep + 0.5 * this.toolbarItemSize;
+			this.imageProgram.imageCenter = new Vector(2 * x / this.canvas.width - 1, 1 - 2 * toolbarCenterY / this.canvas.height);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+			if (this.toolbar[i] == "remove") {
+				gl.bindTexture(gl.TEXTURE_2D, this.toolbarRemoveTexture);
+				if (this.selectedToolbarIndex == i) {
+					this.imageProgram.imageColor = new Vector(1, 0.5, 0.25, 1);
+				}
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+				if (this.selectedToolbarIndex == i) {
+					this.imageProgram.imageColor = new Vector(1, 1, 1, 1);
+				}
+				gl.bindTexture(gl.TEXTURE_2D, this.toolbarItemTexture);
+			}
+		}
+
+		{
+			let x = toolbarLeft + this.selectedToolbarIndexSmooth * toolbarItemStep + 0.5 * this.toolbarItemSize;
+			this.imageProgram.imageColor = new Vector(1, 0.5, 0.25, 1);
+			this.imageProgram.imageSize = new Vector(this.toolbarSelectionSize / this.canvas.width, this.toolbarSelectionSize / this.canvas.height);
+			this.imageProgram.imageCenter = new Vector(2 * x / this.canvas.width - 1, 1 - 2 * toolbarCenterY / this.canvas.height);
+			gl.bindTexture(gl.TEXTURE_2D, this.toolbarSelectionTexture);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+		}
+
+		gl.clear(gl.DEPTH_BUFFER_BIT);
+		gl.enable(gl.DEPTH_TEST);
+		gl.disable(gl.CULL_FACE);
+		gl.bindTexture(gl.TEXTURE_2D, this.thickEdgeTexture);
+
+		gl.useProgram(this.primitiveProgram);
+		this.primitiveProgram.albedo = new Vector(1, 1, 1, 1);
+		this.primitiveProgram.edgeAlbedo = new Vector(0, 0, 0, 1);
+		this.primitiveProgram.emission = new Vector(0, 0, 0, 0);
+		this.primitiveProgram.edgeEmission = new Vector(0, 0, 0, 0);
+
+		let toolbarPreviewCameraWidth = this.canvas.width / toolbarItemStep;
+		this.primitiveProgram.cameraMatrix = Matrix.identity(4)
+			.mult(Matrix.translation(new Vector(0, 1 - toolbarCenterY / (this.canvas.height / 2), 0)))
+			.mult(Matrix.scaling(new Vector(2 / toolbarPreviewCameraWidth, 2 * this.aspectRatio / toolbarPreviewCameraWidth, 2 * this.aspectRatio / toolbarPreviewCameraWidth)))
+			.mult(Matrix.rotationXY(Math.PI/2.0))
+			.mult(Matrix.rotationZX(Math.PI/2.0))
+			.mult(Matrix.rotationZX(Math.PI/6.0))
+			;
+
+		for (let i = 0; i < this.toolbar.length; ++i) {
+			let primitive = this.toolbar[i];
+			if (!(primitive instanceof Primitive)) continue;
+
+			if (i == this.selectedToolbarIndex)
+				this.primitiveProgram.albedo = new Vector(1, 0.5, 0.25, 1);
+
+			let x = - this.toolbar.length * 0.5 + i + 0.5;
+
+			this.primitiveProgram.instanceOffset = new Vector(0, -x, 0);
+			this.primitiveProgram.instanceScale = 0.4 / (primitive.radius);
+			this.primitiveProgram.instanceRotation = Quaternion.axisAngle(new Vector(0, 0, 1), this.toolbarRotation[i]);
+			primitive.mesh.draw();
+
+			if (i == this.selectedToolbarIndex)
+				this.primitiveProgram.albedo = new Vector(1, 1, 1, 1);
+		}
+	}
+}
+
+var frame;
+var lastUpdateTime = new Date();
+var infoPanelOpacity = 1;
+
+function update() {
+	let now = new Date();
+	let dt = (now - lastUpdateTime) * 0.001;
+	lastUpdateTime = now;
+
+	frame.processInputs();
+	frame.update(dt);
+	frame.draw();
+
+	infoPanelOpacity += ((frame.locked ? 0 : 1) - infoPanelOpacity) * (- Math.expm1(- 10 * dt));
+
+	let infoPanel = document.getElementById("infoPanel");
+	infoPanel.style.opacity = infoPanelOpacity;
+
+	let clickPanel = document.getElementById("clickPanel");
+	clickPanel.style.opacity = infoPanelOpacity;
+
+	requestAnimationFrame(update);
+}
+
+function init() {
+	let canvas = document.getElementById("mainCanvas");
+	frame = new PolyhedraFrame(canvas);
+	frame.onResize();
+
+	window.addEventListener('resize', () => {
+		frame.onResize();
+	});
+
+	document.addEventListener('pointerlockchange', () => {
+		if (document.pointerLockElement == canvas) {
+			frame.locked = true;
+		} else {
+			frame.locked = false;
+		}
+	});
+
+	canvas.addEventListener('click', () => {
+  		canvas.requestPointerLock();
+	});
+
+	update();
+}
+
+function resetPlayer() {
+	window.localStorage.removeItem("player");
+	frame.player = new Player();
+	frame.player.camera.aspectRatio = frame.aspectRatio;
+}
+
+var clearSceneCount = 0;
+function clearScene() {
+	let button = document.getElementById("clearSceneButton");
+
+	clearSceneCount += 1;
+	if (clearSceneCount == 1) {
+		button.innerText = "Click again to\ndelete your scene";
+		button.style.backgroundColor = "#7f3f3f";
+	} else if (clearSceneCount >= 2) {
+		clearSceneCount = 0;
+		window.localStorage.removeItem("instances");
+		frame.instances = [];
+		button.innerText = "Clear scene";
+		button.style.backgroundColor = "";
+	}
+}
+</script>
+<style type="text/css">
+* {
+	padding: 0;
+	margin: 0;
+    font-family: monospace;
+}
+
+#mainCanvas {
+	position: fixed;
+	left: 0%;
+	top: 0%;
+	height: 100%;
+	width: 100%;
+}
+
+.panel {
+    background-color: rgba(50, 50, 50, 0.5);
+    border-radius: 12px;
+    border: 2px solid #eee;
+    color: #eee;
+    padding: 12px;
+    backdrop-filter: blur(4px);
+    font-size: 14;
+}
+
+#infoPanel {
+    position: fixed;
+    left: 24px;
+    top: 24px;
+}
+
+#clickPanel {
+  	position: absolute;
+  	top: 50%;
+  	left: 50%;
+  	transform: translate(-50%, -50%);
+  	pointer-events: none;
+}
+
+a {
+    color: #bbb;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #eee;
+    text-decoration: underline;
+}
+
+label {
+    font-family: monospace;
+    font-size: 14;
+    color: #eee;
+}
+
+.button {
+    background-color: rgba(50, 50, 50, 0.5);
+    padding: 4px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 8px;
+    border: 2px solid #eee;
+    text-align: center;
+    cursor: pointer;
+    color: #eee;
+}
+
+.button:hover {
+    background-color: rgba(100, 100, 100, 0.5);
+}
+
+.button:active {
+    background-color: rgba(25, 25, 25, 0.5);
+}
+
+.rowBreak {
+    height: 8px;
+}
+
+table {
+    border: 2px solid #eee;
+    border-radius: 8px;
+    color: #eee;
+    margin: 4px;
+    padding: 4px;
+}
+
+table td:nth-child(3) {
+  text-align: right;
+}
+</style>
+</head>
+<body onload="init();">
+
+<canvas id='mainCanvas'>
+Your browser doesn't support WebGL.
+</canvas>
+
+<div id="infoPanel" class="panel">
+<center>Polyhedria</center>
+<div class="rowBreak"></div>
+<div class="button" onclick="resetPlayer();">Reset player</div>
+<div class="rowBreak"></div>
+<div id="clearSceneButton" class="button" onclick="clearScene();">Clear scene</div>
+<div class="rowBreak"></div>
+<center>Your scene is saved<br>automatically</center>
+<div class="rowBreak"></div>
+<div class="rowBreak"></div>
+<center>Controls:</center>
+<center><table>
+<tr><td>WASD</td><td></td><td>Move</td></tr>
+<tr><td>LShift</td><td></td><td>Turbo</td></tr>
+<tr><td>Space</td><td></td><td>Jump</td></tr>
+<tr><td>C</td><td></td><td>Crouch</td></tr>
+<tr><td>F</td><td></td><td>Jetpack</td></tr>
+<tr><td>R</td><td></td><td>Rotate</td></tr>
+<tr><td>X</td><td></td><td>Delete</td></tr>
+<tr><td>Mouse</td><td></td><td>Place</td></tr>
+<tr><td>Wheel</td><td></td><td>Toolbar</td></tr>
+</table></center>
+<div class="rowBreak"></div>
+<div class="rowBreak"></div>
+<div class="rowBreak"></div>
+<center>by <a href="https://lisyarus.github.io/blog">@lisyarus</a></center>
+</div>
+
+<div id="clickPanel" class="panel">
+CLICK HERE TO START
+</div>
+
+</body>
+</html>
