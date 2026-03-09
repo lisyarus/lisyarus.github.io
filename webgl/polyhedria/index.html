@@ -1725,8 +1725,6 @@ function collisionGJK_EPA(spherePosition, sphereRadius, instance) {
 	// Work in primitive coordinate system, convert back only before return
 	let localSpherePosition = instance.rotation.inverse().rotate(spherePosition.sub(instance.position));
 
-	// console.log("Sphere pos", localSpherePosition.coords);
-
 	// let simplex = [localSpherePosition];
 	let simplex = [];
 	let intersects = false;
@@ -1747,7 +1745,6 @@ function collisionGJK_EPA(spherePosition, sphereRadius, instance) {
 		simplex = minimumNorm[1].map(i => simplex[i]);
 
 		let supportDirection = minimumNorm[0].normalized().mult(-1);
-		// console.log("Support direction", supportDirection.coords);
 
 		let support = sphereMinusPrimitiveSupport(localSpherePosition, sphereRadius, instance.primitive, supportDirection);
 
@@ -1760,8 +1757,6 @@ function collisionGJK_EPA(spherePosition, sphereRadius, instance) {
 
 	if (!intersects)
 		return null;
-
-	// console.log(simplex);
 
 	// Restore simplex orientation
 	{
@@ -2207,9 +2202,7 @@ class Player {
 
 		this.position = this.position.add(this.velocity.mult(dt));
 
-		// console.log("======== NEW FRAME ========");
-
-		for (let iteration = 0; iteration < 2; ++iteration) {
+		for (let iteration = 0; iteration < 8; ++iteration) {
 			let collisionPoint0 = this.position.add(new Vector(0, 0, this.radius));
 			let collisionPoint1 = this.position.add(new Vector(0, 0, this.cameraHeight));
 
@@ -2364,7 +2357,9 @@ class PolyhedraFrame extends Frame {
 			this.player.load(JSON.parse(playerData));
 		}
 
-		this.loadInstances();
+		let instances = window.localStorage.getItem("instances");
+		if (instances)
+			this.loadInstances(JSON.parse(instances));
 	}
 
 	findPrimitive(name) {
@@ -2386,18 +2381,15 @@ class PolyhedraFrame extends Frame {
 			});
 		}
 
-		window.localStorage.setItem("instances", JSON.stringify(data));
+		return data;
 	}
 
-	loadInstances() {
-		let data = window.localStorage.getItem("instances");
-		if (data) {
-			for (let instance of JSON.parse(data)) {
-				let primitive = this.findPrimitive(instance.primitive);
-				let position = new Vector(...instance.position);
-				let rotation = new Quaternion(...instance.rotation);
-				this.instances.push(new PrimitiveInstance(primitive, position, rotation));
-			}
+	loadInstances(instances) {
+		for (let instance of instances) {
+			let primitive = this.findPrimitive(instance.primitive);
+			let position = new Vector(...instance.position);
+			let rotation = new Quaternion(...instance.rotation);
+			this.instances.push(new PrimitiveInstance(primitive, position, rotation));
 		}
 	}
 
@@ -2940,7 +2932,7 @@ class PolyhedraFrame extends Frame {
 		}
 
 		if (needSaveInstances)
-			this.saveInstances();
+			window.localStorage.setItem("instances", JSON.stringify(this.saveInstances()));
 	}
 
 	onMouseWheel(event) {
@@ -3434,6 +3426,206 @@ function clearScene() {
 		button.style.backgroundColor = "";
 	}
 }
+
+async function saveToJSON()
+{
+    const handle = await window.showSaveFilePicker({
+        id: "polyhedria",
+        startIn: "downloads",
+        suggestedName: "polyhedria-scene.json",
+        types: [{
+            description: "JSON file",
+            accept: {"application/json": [".json"]},
+        }],
+    });
+
+    let data = {
+    	player: frame.player.save(),
+    	instances: frame.saveInstances(),
+    };
+
+    const writable = await handle.createWritable();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.write("\n");
+    await writable.close();
+}
+
+async function loadFromJSON()
+{
+    const [handle] = await window.showOpenFilePicker({
+        id: "polyhedria",
+        startIn: "downloads",
+        suggestedName: "polyhedria-scene.json",
+        types: [{
+            description: "JSON file",
+            accept: {"application/json": [".json"]},
+        }],
+    });
+
+    const file = await handle.getFile();
+    const dataText = await file.text();
+    let data = JSON.parse(dataText);
+
+    frame.player.load(data.player);
+    frame.loadInstances(data.instances);
+}
+
+function concatBuffers(buffer1, buffer2) {
+	let result = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+	result.set(new Uint8Array(buffer1), 0);
+	result.set(new Uint8Array(buffer2), buffer1.byteLength);
+	return result.buffer;
+}
+
+async function exportToGLB()
+{
+    const handle = await window.showSaveFilePicker({
+        id: "polyhedria",
+        startIn: "downloads",
+        suggestedName: "polyhedria-scene.glb",
+        types: [{
+            description: "GLB file",
+            accept: {"model/gltf-binary": [".glb"]},
+        }],
+    });
+
+    let meshIdByPrimitive = new Map();
+    let instanceCountByPrimitive = new Map();
+    let nodeIds = [];
+    let nodes = [];
+    let meshes = [];
+    let accessors = [];
+    let bufferViews = [];
+
+    let bufferContents = new ArrayBuffer(0);
+
+    let rotateToGLTF = Quaternion.axisAngle(new Vector(1, 0, 0), -Math.PI / 2);
+
+    for (let instance of frame.instances) {
+    	if (!instanceCountByPrimitive.has(instance.primitive)) {
+    		instanceCountByPrimitive.set(instance.primitive, 0);
+    		meshIdByPrimitive.set(instance.primitive, meshes.length);
+
+    		let totalMeshIndices = 0;
+    		for (let face of instance.primitive.faceVertices) {
+    			totalMeshIndices += (face.length - 2) * 3;
+    		}
+
+    		let primitiveBuffer = new ArrayBuffer(instance.primitive.vertices.length * 12 + totalMeshIndices * 4);
+
+    		let vertexView = new Float32Array(primitiveBuffer, 0, instance.primitive.vertices.length * 3);
+    		for (let i = 0; i < instance.primitive.vertices.length; ++i) {
+    			vertexView[3 * i + 0] = instance.primitive.vertices[i].coords[0];
+    			vertexView[3 * i + 1] = instance.primitive.vertices[i].coords[1];
+    			vertexView[3 * i + 2] = instance.primitive.vertices[i].coords[2];
+    		}
+
+    		let indexView = new Uint32Array(primitiveBuffer, instance.primitive.vertices.length * 12, totalMeshIndices);
+    		let indexIndex = 0;
+    		for (let i = 0; i < instance.primitive.faceVertices.length; ++i) {
+    			let face = instance.primitive.faceVertices[i];
+    			for (let j = 1; j + 1 < face.length; ++j) {
+    				indexView[indexIndex + 0] = face[0];
+    				indexView[indexIndex + 1] = face[j];
+    				indexView[indexIndex + 2] = face[j + 1];
+    				indexIndex += 3;
+    			}
+    		}
+
+    		let globalVertexOffset = bufferContents.byteLength;
+    		let globalIndexOffset = bufferContents.byteLength + instance.primitive.vertices.length * 12;
+
+    		bufferContents = concatBuffers(bufferContents, primitiveBuffer);
+
+    		let meshIndex = meshes.length;
+    		meshes.push({
+    			name: instance.primitive.name + " mesh",
+    			primitives: [
+    				{
+    					attributes: { POSITION: 2 * meshIndex },
+    					indices: 2 * meshIndex + 1,
+    				},
+    			],
+    		});
+
+    		accessors.push({
+    			bufferView: 2 * meshIndex,
+    			componentType: 5126, // FLOAT
+    			type: "VEC3",
+    			count: instance.primitive.vertices.length,
+    			min: instance.primitive.bbox.min.coords,
+    			max: instance.primitive.bbox.max.coords,
+    		});
+
+    		accessors.push({
+    			bufferView: 2 * meshIndex + 1,
+    			componentType: 5125, // UNSIGNED_INT
+    			type: "SCALAR",
+    			count: totalMeshIndices,
+    		});
+
+    		bufferViews.push({
+    			buffer: 0,
+    			byteOffset: globalVertexOffset,
+    			byteLength: instance.primitive.vertices.length * 12,
+    			target: 34962, // ARRAY_BUFFER
+    		});
+
+    		bufferViews.push({
+    			buffer: 0,
+    			byteOffset: globalIndexOffset,
+    			byteLength: totalMeshIndices * 4,
+    			target: 34963, // ELEMENT_ARRAY_BUFFER
+    		});
+    	}
+    	let instanceIndex = instanceCountByPrimitive.get(instance.primitive);
+    	instanceCountByPrimitive.set(instance.primitive, instanceIndex + 1);
+    	nodeIds.push(nodeIds.length);
+    	nodes.push({
+    		mesh: meshIdByPrimitive.get(instance.primitive),
+    		name: instance.primitive.name + " " + (instanceIndex + 1),
+    		translation: rotateToGLTF.rotate(instance.position).coords,
+    		rotation: (rotateToGLTF.mult(instance.rotation)).coords,
+    	});
+    }
+
+    let jsonData = {
+    	asset: {
+    		generator: "Polyhedria web app",
+    		version: "2.0",
+    	},
+    	scene: 0,
+    	scenes: [{
+    		name: "Scene",
+    		nodes: nodeIds,
+    	}],
+    	nodes: nodes,
+    	meshes: meshes,
+    	accessors: accessors,
+    	bufferViews: bufferViews,
+    	buffers: [
+    		{
+    			byteLength: bufferContents.byteLength,
+    		},
+    	],
+    };
+
+    let jsonText = JSON.stringify(jsonData);
+    let jsonBuffer = (new TextEncoder()).encode(jsonText);
+    let jsonPadBytes = (4 - (jsonBuffer.byteLength % 4)) % 4;
+    let jsonTotalBytes = jsonBuffer.length + jsonPadBytes;
+
+    let totalFileSize = 28 + jsonTotalBytes + bufferContents.byteLength;
+
+    const writable = await handle.createWritable();
+    await writable.write(new Uint32Array([0x46546C67, 2, totalFileSize, jsonTotalBytes, 0x4E4F534A]));
+    await writable.write(jsonBuffer);
+    for (let i = 0; i < jsonPadBytes; ++i)
+    	await writable.write(" ");
+    await writable.write(new Uint32Array([bufferContents.byteLength, 0x004E4942]));
+    await writable.write(bufferContents);
+    await writable.close();
+}
 </script>
 <style type="text/css">
 * {
@@ -3540,7 +3732,14 @@ Your browser doesn't support WebGL.
 <div class="rowBreak"></div>
 <div id="clearSceneButton" class="button" onclick="clearScene();">Clear scene</div>
 <div class="rowBreak"></div>
-<center>Your scene is saved<br>automatically</center>
+<div class="button" onclick="saveToJSON();">Save scene</div>
+<div class="rowBreak"></div>
+<div class="button" onclick="loadFromJSON();">Load scene</div>
+<div class="rowBreak"></div>
+<div class="button" onclick="exportToGLB();">Export GLB</div>
+<div class="rowBreak"></div>
+<div class="rowBreak"></div>
+<center>Your scene is saved in<br>browser automatically</center>
 <div class="rowBreak"></div>
 <div class="rowBreak"></div>
 <center>Controls:</center>
@@ -3555,7 +3754,6 @@ Your browser doesn't support WebGL.
 <tr><td>Mouse</td><td></td><td>Place</td></tr>
 <tr><td>Wheel</td><td></td><td>Toolbar</td></tr>
 </table></center>
-<div class="rowBreak"></div>
 <div class="rowBreak"></div>
 <div class="rowBreak"></div>
 <center>by <a href="https://lisyarus.github.io/blog">@lisyarus</a></center>
