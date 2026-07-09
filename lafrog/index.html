@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Frog</title>
+    <link rel="icon" type="image/png" href="/lafrog/icon.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #fed;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+    <script>
+        
+        const isMobile = window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
+
+        let canvas;
+        let lastUpdateTime;
+        let dpr = 1;
+        let mouse = [0, 0];
+        let restartMouseover = false;
+
+        const N = 5;
+        const P = 0.2;
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let gridBottom = 0;
+
+        let frogCell;
+        let frogPosition;
+        let frogVelocity;
+        let frogTongue;
+        let frogTongueFixed;
+        let frogLegsPosition;
+        let frogLegsPositionTarget;
+        let frogLegsJoints;
+        let frogLegLength;
+        let frogDirection;
+        let frogRotation;
+
+        let flies;
+        let dyingFlies;
+        let messages;
+        let score;
+        let gameOver;
+
+        let simplifiedVisuals = false;
+
+        let bestScore = localStorage.getItem('bestScore');
+        if (bestScore == null) {
+            bestScore = 0;
+        }
+
+        function restart() {
+            frogCell = [Math.floor(N / 2), Math.floor(N / 2)];
+            frogPosition = [frogCell[0], frogCell[1]];
+            frogLegsPosition = null;
+            frogLegsPositionTarget = null;
+            frogLegsJoints = null;
+            frogLegLength = [0, 0, 0, 0];
+            frogLegAnchor = [0, 0, 0, 0];
+            frogVelocity = [0, 0];
+            frogTongue = [frogPosition[0], frogPosition[1]];
+            frogTongueFixed = false;
+            frogDirection = 0;
+            frogRotation = 0;
+
+            flies = [[0, frogCell[1], 0, false], [N-1, frogCell[1], 0, true]];
+            dyingFlies = [];
+            messages = [];
+            score = 0;
+            gameOver = false;
+        }
+
+        function tryRestart() {
+            if (gameOver) {
+                restart();
+                return true;
+            }
+            return false;
+        }
+
+        function resize() {
+            dpr = window.devicePixelRatio || 1;
+    
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+        }
+
+        function newFly() {
+            for (let iteration = 0; iteration < 1000; ++iteration) {
+                let x = Math.min(N - 1, Math.floor(Math.random() * N));
+                let y = Math.min(N - 1, Math.floor(Math.random() * N));
+
+                if (frogCell[0] == x && frogCell[1] == y) continue;
+
+                let occupied = false;
+                for (let fly of flies) {
+                    if (fly[0] == x && fly[1] == y) {
+                        occupied = true;
+                        break;
+                    }
+                }
+
+                if (occupied) continue;
+
+                flies.push([x, y, 0, Math.random() < P]);
+                break;
+            }
+        }
+
+        function updateBestScore() {
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('bestScore', bestScore);
+            }
+        }
+
+        function checkGameOver() {
+            let left = frogCell[0] == 0;
+            let right = frogCell[0] + 1 == N;
+            let top = frogCell[1] == 0;
+            let bottom = frogCell[1] + 1 == N;
+
+            for (let fly of flies) {
+                if (!fly[3]) continue;
+
+                if (frogCell[0] == fly[0]) {
+                    if (frogCell[1] == fly[1] - 1) {
+                        bottom = true;
+                    } else if (frogCell[1] == fly[1] + 1) {
+                        top = true;
+                    }
+                }
+                if (frogCell[1] == fly[1]) {
+                    if (frogCell[0] == fly[0] - 1) {
+                        right = true;
+                    } else if (frogCell[0] == fly[0] + 1) {
+                        left = true;
+                    }
+                }
+            }
+
+            if (left && right && top && bottom) {
+                gameOver = true;
+            }
+        }
+
+        function onMove(moveX, moveY) {
+            if (gameOver) {
+                return;
+            }
+
+            if (moveX == 0 && moveY == 0) {
+                return;
+            }
+
+            if (moveX < 0) {
+                frogDirection = 3;
+            } else if (moveX > 0) {
+                frogDirection = 1;
+            } else if (moveY < 0) {
+                frogDirection = 0;
+            } else {
+                frogDirection = 2;
+            }
+
+            frogTongueFixed = false;
+            let collisionStart = false;
+            let hits = 0;
+            let moves = 0;
+
+            while (true) {
+                let newX = frogCell[0] + moveX;
+                let newY = frogCell[1] + moveY;
+
+                if (newX < 0 || newX >= N || newY < 0 || newY >= N)
+                    break;
+
+                let collision = false;
+                let stopped = false;
+                for (let i = 0; i < flies.length; ++i) {
+                    let fly = flies[i];
+                    if (fly[0] == newX && fly[1] == newY) {
+                        if (!collisionStart && fly[3]) {
+                            stopped = true;
+                            break;
+                        }
+                        flies.splice(i, 1);
+                        hits += 1;
+                        score += hits;
+                        collision = true;
+                        frogTongueFixed = true;
+                        frogTongue = [fly[0], fly[1]];
+                        dyingFlies.push([fly[0], fly[1], 0]);
+
+                        let r = 204 - 68 * (hits - 1);
+                        let g = 204 - 17 * (hits - 1);
+                        let b = r;
+                        messages.push([fly[0], fly[1], `+${hits}`, 0, `rgba(${r}, ${g}, ${b}, 1.0)`]);
+                        break;
+                    }
+                }
+
+                if (stopped) {
+                    break;
+                }
+
+                if (!collisionStart && collision) {
+                    collisionStart = true;
+                } else if (collisionStart && !collision) {
+                    break;
+                }
+
+                frogCell[0] = newX;
+                frogCell[1] = newY;
+                moves += 1;
+            }
+
+            if (moves > 0) {
+                newFly();
+            } else {
+                frogVelocity[0] += moveX * 15;
+                frogVelocity[1] += moveY * 15;
+            }
+
+            updateBestScore();
+            checkGameOver();
+        }
+
+        function keydown(event) {
+            if (event.key == ' ' || event.key == 'Enter') {
+                tryRestart();
+                return;
+            }
+
+            let moveX = 0;
+            let moveY = 0;
+
+            if (event.key == 'a' || event.key == 'ArrowLeft' || event.key == 'h') {
+                moveX -= 1;
+            }
+            else if (event.key == 'd' || event.key == 'ArrowRight' || event.key == 'l') {
+                moveX += 1;
+            }
+            else if (event.key == 's' || event.key == 'ArrowDown' || event.key == 'j') {
+                moveY += 1;
+            }
+            else if (event.key == 'w' || event.key == 'ArrowUp' || event.key == 'k') {
+                moveY -= 1;
+            }
+
+            onMove(moveX, moveY);
+        }
+
+        function swipe() {
+            const SWIPE_THRESHOLD = 20;
+
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                    if (deltaX > 0) {
+                        onMove(1, 0);
+                    } else {
+                        onMove(-1, 0);
+                    }
+                }
+            } else {
+                if (Math.abs(deltaY) > SWIPE_THRESHOLD) {
+                    if (deltaY > 0) {
+                        onMove(0, 1);
+                    } else {
+                        onMove(0, -1);
+                    }
+                }
+            }
+        }
+
+        function update() {
+            const now = performance.now();
+
+            let dt = 0;
+            if (!(lastUpdateTime === undefined)) {
+                dt = (now - lastUpdateTime) / 1000;
+            }
+            lastUpdateTime = now;
+
+            frogPosition[0] += frogVelocity[0] * dt;
+            frogPosition[1] += frogVelocity[1] * dt;
+
+            const frictionFactor = Math.exp(- dt * (isMobile ? 100 : 100));
+            frogVelocity[0] *= frictionFactor;
+            frogVelocity[1] *= frictionFactor;
+
+            const lerpFactor = -Math.expm1(- dt * (isMobile ? 20 : 10));
+            frogPosition[0] += (frogCell[0] - frogPosition[0]) * lerpFactor;
+            frogPosition[1] += (frogCell[1] - frogPosition[1]) * lerpFactor;
+
+            const rotationLerpFactor = -Math.expm1(- dt * (isMobile ? 20 : 10));
+            let frogRotationTarget = frogDirection * Math.PI / 2;
+            while (frogRotationTarget > frogRotation + Math.PI)
+                frogRotationTarget -= Math.PI * 2;
+            while (frogRotationTarget < frogRotation - Math.PI)
+                frogRotationTarget += Math.PI * 2;
+            frogRotation += (frogRotationTarget - frogRotation) * rotationLerpFactor;
+
+            if (frogLegsPosition != null) {
+                if (frogLegsJoints == null) {
+                    frogLegsJoints = [[0, 0], [0, 0], [0, 0], [0, 0]];
+                }
+
+                let frogCos = Math.cos(frogRotation);
+                let frogSin = Math.sin(frogRotation);
+
+                const legsLerpFactor = -Math.expm1(- dt * (isMobile ? 30 : 30));
+                for (let i = 0; i < 4; ++i) {
+                    frogLegsPosition[i][0] += (frogLegsPositionTarget[i][0] - frogLegsPosition[i][0]) * legsLerpFactor;
+                    frogLegsPosition[i][1] += (frogLegsPositionTarget[i][1] - frogLegsPosition[i][1]) * legsLerpFactor;
+
+                    let anchorX = frogPosition[0] - frogSin * frogLegAnchor[i];
+                    let anchorY = frogPosition[1] + frogCos * frogLegAnchor[i];
+
+                    let length = 0.5 * Math.sqrt((frogLegsPosition[i][0] - anchorX) ** 2 + (frogLegsPosition[i][1] - anchorY) ** 2);
+                    let minLength = frogLegLength[i] * 0.55;
+
+                    let x = (i % 2) * 2 - 1;
+                    let y = Math.floor(i / 2) * 2 - 1;
+
+                    frogLegsJoints[i][0] = (anchorX + frogLegsPosition[i][0]) / 2;
+                    frogLegsJoints[i][1] = (anchorY + frogLegsPosition[i][1]) / 2;
+
+                    if (length < minLength && length > 0) {
+                        let delta = Math.sqrt(Math.max(0.0, minLength * minLength - length * length));
+
+                        frogLegsJoints[i][0] -= (frogLegsPosition[i][1] - anchorY) * (delta / length / 2) * x;
+                        frogLegsJoints[i][1] += (frogLegsPosition[i][0] - anchorX) * (delta / length / 2) * x;
+                    }
+                }
+            }
+
+            if (!frogTongueFixed) {
+                frogTongue[0] = frogPosition[0];
+                frogTongue[1] = frogPosition[1];
+            }
+
+            for (let fly of flies) {
+                fly[2] += 2.0 * dt;
+            }
+
+            let newDyingFlies = [];
+            for (let fly of dyingFlies) {
+                if (fly[2] > 1.0) continue;
+                fly[2] += 3.0 * dt;
+                newDyingFlies.push(fly);
+            }
+            dyingFlies = newDyingFlies;
+
+            let newMessages = [];
+            for (let msg of messages) {
+                if (msg[3] > 1.0) continue;
+                msg[3] += 0.5 * dt;
+                newMessages.push(msg);
+            }
+            messages = newMessages;
+        }
+
+        function draw() {
+            const ctx = canvas.getContext('2d');
+
+            const gridExtent = Math.min(canvas.width, canvas.height) * (isMobile ? 0.9 : 0.6);
+            const gridLeft = canvas.width / 2 - gridExtent / 2;
+            const gridTop = canvas.height / 2 - gridExtent / 2;
+            const gridRight = gridLeft + gridExtent;
+            gridBottom = gridTop + gridExtent;
+
+            const cellMargin = isMobile ? 6 * dpr : 10 * dpr;
+            const cellSize = (gridExtent - cellMargin) / N - cellMargin;
+            const cellGridSize = cellSize + cellMargin;
+
+            const frogSize = cellSize * 0.7;
+            const flySize = cellSize * 0.4;
+
+            const gridRoundness = 20 * dpr;
+            const cellRoundness = gridRoundness - cellMargin;
+
+            function gridToScreen(coord) {
+                return [
+                    gridLeft + (cellMargin + cellGridSize) / 2 + cellGridSize * coord[0],
+                    gridTop + (cellMargin + cellGridSize) / 2 + cellGridSize * coord[1],
+                ];
+            }
+
+            function screenToGrid(coord) {
+                return [
+                    (coord[0] - gridLeft - (cellMargin + cellGridSize) / 2) / cellGridSize,
+                    (coord[1] - gridTop - (cellMargin + cellGridSize) / 2) / cellGridSize,
+                ];
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 40;
+            ctx.fillStyle = '#765';
+            ctx.beginPath();
+            ctx.roundRect(gridLeft, gridTop, gridExtent, gridExtent, gridRoundness);
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+
+            ctx.fillStyle = '#cba';
+            for (let y = 0; y < N; ++y) {
+                for (let x = 0; x < N; ++x) {
+                    ctx.beginPath();
+                    ctx.roundRect(gridLeft + cellMargin * (x + 1) + cellSize * x, gridTop + cellMargin * (y + 1) + cellSize * y, cellSize, cellSize, cellRoundness);
+                    ctx.fill();
+                }
+            }
+
+            for (let fly of flies) {
+                let t = Math.min(1.0, fly[2]);
+                let size = (- 2 * t * t * t + 3 * t * t) + 10 * (t * t * t - 2 * t * t + t);
+                let extent = flySize * size / 2;
+
+                const flyScreen = gridToScreen(fly);
+
+                if (simplifiedVisuals) {
+                    if (fly[3])
+                        ctx.fillStyle = '#644';
+                    else
+                        ctx.fillStyle = '#666';
+                    ctx.beginPath();
+                    ctx.arc(flyScreen[0], flyScreen[1], extent, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    if (fly[3]) {
+                        ctx.strokeStyle = '#422';
+                        ctx.lineWidth = (isMobile ? 3 : 4) * dpr;
+                        ctx.beginPath();
+                        for (let y = -1; y <= 1; ++y) {
+                            for (let x of [-1, 1]) {
+                                let my = (y == 0) ? 0.5 : y;
+                                let sy = (y == -1) ? 0.5 : 0.75;
+                                let dy = (y == -1) ? 1.0 : 1.25;
+                                ctx.moveTo(flyScreen[0], flyScreen[1]);
+                                ctx.lineTo(flyScreen[0] + x * extent * 0.625, flyScreen[1] + y * extent * sy);
+                                ctx.lineTo(flyScreen[0] + x * extent * 0.875, flyScreen[1] + my * extent * dy);
+                            }
+                        }
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#644';
+                        ctx.beginPath();
+                        ctx.ellipse(flyScreen[0], flyScreen[1], extent / 2, extent, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#555';
+                        ctx.beginPath();
+                        ctx.ellipse(flyScreen[0], flyScreen[1], extent / 2, extent, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#888';
+                        for (let sign of [-1, 1]) {
+                            ctx.beginPath();
+                            ctx.ellipse(flyScreen[0] + sign * extent / 2, flyScreen[1] + extent / 4, extent / 4, extent, - sign * Math.PI / 8, - Math.PI / 4, Math.PI * (5 / 4));
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+
+            ctx.fillStyle = '#ddd';
+            for (let fly of dyingFlies) {
+                const flyScreen = gridToScreen(fly);
+                ctx.globalAlpha = Math.max(0.0, 1.0 - fly[2]);
+                ctx.beginPath();
+                ctx.arc(flyScreen[0], flyScreen[1], flySize * (1.0 + 2.0 * fly[2]) / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            const frogScreen = gridToScreen(frogPosition);
+            const frogTongueScreen = gridToScreen(frogTongue);
+
+            ctx.strokeStyle = '#c77';
+            ctx.lineWidth = flySize * 0.5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(frogScreen[0], frogScreen[1]);
+            ctx.lineTo(frogTongueScreen[0], frogTongueScreen[1]);
+            ctx.stroke();
+            ctx.lineCap = 'butt';
+
+            if (simplifiedVisuals) {
+                ctx.fillStyle = '#564';
+                ctx.beginPath();
+                ctx.arc(frogScreen[0], frogScreen[1], frogSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                let extent = frogSize * 0.5;
+
+                ctx.lineWidth = extent * 0.1;
+                ctx.strokeStyle = '#342';
+                ctx.fillStyle = '#564';
+
+                let initLegs = false;
+                if (frogLegsPosition == null) {
+                    frogLegsPosition = [[0, 0], [0, 0], [0, 0], [0, 0]];
+                    frogLegsPositionTarget = [[0, 0], [0, 0], [0, 0], [0, 0]];
+                    initLegs = true;
+                }
+
+                let frogCos = Math.cos(frogRotation);
+                let frogSin = Math.sin(frogRotation);
+
+                let i = 0;
+                for (let y = -1; y <= 1; y += 2) {
+                    for (let x = -1; x <= 1; x += 2) {
+                        let tx = x * extent * (y == -1 ? 0.8 : 1.0);
+                        let ty = y * extent * (y == -1 ? 0.8 : 0.4);
+
+                        let targetX = frogScreen[0] + (frogCos * tx - frogSin * ty);
+                        let targetY = frogScreen[1] + (frogCos * ty + frogSin * tx);
+
+                        frogLegsPositionTarget[i] = screenToGrid([targetX, targetY]);
+
+                        if (initLegs) {
+                            frogLegsPosition[i] = screenToGrid([targetX, targetY]);
+                            frogLegAnchor[i] = (y == -1 ? -0.1 : 0.2);
+                        }
+
+                        let anchorX = frogPosition[0] - frogSin * frogLegAnchor[i];
+                        let anchorY = frogPosition[1] + frogCos * frogLegAnchor[i];
+
+                        if (initLegs) {
+                            frogLegLength[i] = Math.sqrt((frogLegsPosition[i][0] - anchorX) ** 2 + (frogLegsPosition[i][1] - anchorY) ** 2);
+                        }
+
+                        let anchorScreen = gridToScreen([anchorX, anchorY]);
+
+                        if (initLegs) {
+                            ctx.beginPath();
+                            ctx.moveTo(anchorScreen[0], anchorScreen[1]);
+                            ctx.lineTo(targetX, targetY);
+                            ctx.stroke();
+                        } else {
+                            let jointScreen = gridToScreen(frogLegsJoints[i]);
+                            let legScreen = gridToScreen(frogLegsPosition[i]);
+
+                            ctx.beginPath();
+                            ctx.moveTo(anchorScreen[0], anchorScreen[1]);
+                            ctx.lineTo(jointScreen[0], jointScreen[1]);
+                            ctx.lineTo(legScreen[0], legScreen[1]);
+                            ctx.stroke();
+                        }
+
+                        let legScreen = gridToScreen(frogLegsPosition[i]);
+                        ctx.beginPath();
+                        ctx.arc(legScreen[0], legScreen[1], extent * 0.2, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ++i;
+                    }
+                }
+
+                ctx.save();
+                ctx.translate(frogScreen[0], frogScreen[1]);
+                ctx.rotate(frogRotation);
+
+                ctx.beginPath();
+                ctx.ellipse(0, 0, extent / 2, extent, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(- extent * 0.2, - extent * 0.8, extent * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(  extent * 0.2, - extent * 0.8, extent * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // ctx.fillStyle = '#9a8';
+                // ctx.beginPath();
+                // ctx.arc(- extent * 0.2, - extent * 0.8, extent * 0.2, Math.PI * 0.75, Math.PI * 1.75);
+                // ctx.fill();
+                // ctx.beginPath();
+                // ctx.arc(  extent * 0.2, - extent * 0.8, extent * 0.2, Math.PI * 1.25, Math.PI * 2.25);
+                // ctx.fill();
+
+                ctx.restore();
+            }
+
+            const fontSize = Math.round((isMobile ? 28 : 32) * dpr);
+            const textRectRoundness = 10 * dpr;
+            const textRectWidth = 250 * dpr;
+            const textRectLineWidth = 4 * dpr;
+            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            {
+                let textX = canvas.width / 2;
+                let textY = (gridTop / 2 - fontSize / 2) / 2 - (isMobile ? 10 : 5);
+                let rectHeight = fontSize * 1.5;
+                ctx.fillStyle = '#aaa';
+                ctx.lineWidth = textRectLineWidth;
+                ctx.strokeStyle = '#555';
+                ctx.beginPath();
+                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#555';
+                ctx.fillText(`BEST: ${bestScore}`, textX, textY);
+            }
+            {
+                let textX = canvas.width / 2;
+                let textY = gridTop / 2;
+                let rectHeight = fontSize * 1.5;
+                ctx.fillStyle = '#9a8';
+                ctx.lineWidth = textRectLineWidth;
+                ctx.strokeStyle = '#564';
+                ctx.beginPath();
+                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#564';
+                ctx.fillText(`SCORE: ${score}`, textX, textY);
+            }
+            if (gameOver) {
+                let textX = canvas.width / 2;
+                let textY = (gridTop / 2 + fontSize / 2 + gridTop) / 2 + (isMobile ? 10 : 5);
+                let rectHeight = fontSize * 1.5;
+                ctx.fillStyle = '#daa';
+                ctx.lineWidth = textRectLineWidth;
+                ctx.strokeStyle = '#b55';
+                ctx.beginPath();
+                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#b55';
+                ctx.fillText("GAME OVER", canvas.width / 2, textY);
+            }
+            restartMouseover = false;
+            if (gameOver) {
+                let textX = canvas.width / 2;
+                let textY = (gridBottom + canvas.height) / 2;
+                let rectHeight = fontSize * 1.5;
+
+                let rectLeft = textX - textRectWidth / 2;
+                let rectRight = rectLeft + textRectWidth;
+                let rectTop = textY - rectHeight / 2 - 2;
+                let rectBottom = rectTop + rectHeight;
+
+                restartMouseover = (rectLeft <= mouse[0] && mouse[0] <= rectRight && rectTop <= mouse[1] && mouse[1] <= rectBottom);
+
+                ctx.fillStyle = restartMouseover ? '#dd9' : '#dc9';
+                ctx.lineWidth = textRectLineWidth;
+                ctx.strokeStyle = restartMouseover ? '#bb5' : '#b85';
+                ctx.beginPath();
+                ctx.roundRect(rectLeft, rectTop, textRectWidth, rectHeight, textRectRoundness);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = restartMouseover ? '#bb5' : '#b85';
+                ctx.fillText("RESTART", canvas.width / 2, textY);
+            }
+
+            if (restartMouseover) {
+                document.body.style.cursor = 'pointer';
+            } else {
+                document.body.style.cursor = 'default';
+            }
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 5;
+            for (let msg of messages) {
+                ctx.fillStyle = msg[4];
+                ctx.globalAlpha = Math.sqrt(Math.max(0.0, 1.0 - msg[3]));
+                let screen = gridToScreen(msg);
+                let x = screen[0];
+                let y = screen[1] - msg[3] * cellGridSize * 1.5;
+                ctx.fillText(msg[2], x, y);
+            }
+            ctx.globalAlpha = 1.0;
+            ctx.shadowColor = 'transparent';
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(canvas.width / canvas.height, 1);
+            const vignetteRadius = canvas.height / Math.sqrt(2.0);
+            const vignette = ctx.createRadialGradient(
+                0, 0, vignetteRadius * 0.6,
+                0, 0, vignetteRadius
+            );
+            let maxVignette = 0.4;
+            for (let i = 0; i <= 10; ++i) {
+                let t = i / 10;
+                let a = (t * t) * maxVignette;
+                vignette.addColorStop(t, `rgba(32, 32, 0, ${a})`);
+            }
+            ctx.fillStyle = vignette;
+            ctx.fillRect(- canvas.height / 2, - canvas.height / 2, canvas.height, canvas.height);
+            ctx.restore();
+        }
+
+        function frameCallback() {
+            update();
+            draw();
+            window.requestAnimationFrame(frameCallback);
+        }
+
+        function randomBot() {
+            if (gameOver) return;
+
+            let move = Math.min(3, Math.floor(Math.random() * 4));
+            if (move == 0) {
+                onMove(-1, 0);
+            } else if (move == 1) {
+                onMove( 1, 0);
+            } else if (move == 2) {
+                onMove(0, -1);
+            } else if (move == 3) {
+                onMove(0,  1);
+            }
+        }
+
+        function init() {
+            canvas = document.getElementById('canvas');
+
+            window.addEventListener('resize', resize);
+            window.addEventListener('keydown', keydown);
+
+            window.addEventListener('click', () => {
+                if (restartMouseover) {
+                    tryRestart();
+                }
+            });
+
+            window.addEventListener('mousemove', (event) => {
+                mouse = [event.clientX, event.clientY];
+            });
+
+            window.addEventListener('touchstart', e => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+
+                if (isMobile && touchStartY * dpr >= gridBottom) {
+                    tryRestart();
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchend', e => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                swipe();
+            }, { passive: true });
+
+            resize();
+            restart();
+            frameCallback();
+
+            // setInterval(randomBot, 4);
+        }
+
+    </script>
+</head>
+<body onload="init();">
+    <canvas id="canvas">
+</body>
+</html>
