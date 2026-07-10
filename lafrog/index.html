@@ -92,6 +92,45 @@
             gameOver = false;
         }
 
+        function tryLoadGame() {
+            var state = localStorage.getItem('gameState');
+            if (state == null)
+                return;
+
+            state = JSON.parse(state);
+
+            frogCell = state.frog.position;
+            frogPosition = [frogCell[0], frogCell[1]];
+            frogDirection = state.frog.direction;
+            frogRotation = frogDirection * Math.PI / 2;
+            score = state.score;
+
+            flies = [];
+            for (let fly of state.flies) {
+                flies.push([fly.position[0], fly.position[1], 0, fly.is_bug]);
+            }
+        }
+
+        function saveGame() {
+            var state = {
+                frog: {
+                    position: frogCell,
+                    direction: frogDirection,
+                },
+                flies: [],
+                score: score,
+            };
+
+            for (let fly of flies) {
+                state.flies.push({
+                    position: [fly[0], fly[1]],
+                    is_bug: fly[3],
+                });
+            }
+
+            localStorage.setItem('gameState', JSON.stringify(state));
+        }
+
         function tryRestart() {
             if (gameOver) {
                 restart();
@@ -246,6 +285,7 @@
 
             updateBestScore();
             checkGameOver();
+            saveGame();
         }
 
         function keydown(event) {
@@ -774,6 +814,8 @@
 
             resize();
             restart();
+            tryLoadGame();
+            checkGameOver();
             frameCallback();
 
             // setInterval(randomBot, 4);
