@@ -709,7 +709,7 @@
                 let rectTop = textY - textRectHeight / 2 - 2;
                 let rectBottom = rectTop + textRectHeight;
 
-                restartMouseover = (rectLeft <= mouse[0] && mouse[0] <= rectRight && rectTop <= mouse[1] && mouse[1] <= rectBottom);
+                restartMouseover = (rectLeft * dpr <= mouse[0] && mouse[0] <= rectRight * dpr && rectTop * dpr <= mouse[1] && mouse[1] <= rectBottom * dpr);
 
                 ctx.fillStyle = restartMouseover ? '#dd9' : '#dc9';
                 ctx.lineWidth = textRectLineWidth;
@@ -735,7 +735,7 @@
                 let lw = 10 * dpr * scale;
 
                 newGameRect = [cx - 2 * r, cx + 2 * r, cy - 2 * r, cy + 2 * r];
-                newGameMouseover = (newGameRect[0] <= mouse[0] && mouse[0] <= newGameRect[1] && newGameRect[2] <= mouse[1] && mouse[1] <= newGameRect[3]);
+                newGameMouseover = (newGameRect[0] <= mouse[0] * dpr && mouse[0] * dpr <= newGameRect[1] && newGameRect[2] <= mouse[1] * dpr && mouse[1] * dpr <= newGameRect[3]);
 
                 let color = newGameMouseover ? '#dcb' : '#ba9';
 
@@ -846,7 +846,7 @@
                     saveGame();
                 }
 
-                if (isMobile && newGameRect[0] <= touchStartX && touchStartX <= newGameRect[1] && newGameRect[2] <= touchStartY && touchStartY <= newGameRect[3]) {
+                if (isMobile && newGameRect[0] <= touchStartX * dpr && touchStartX * dpr <= newGameRect[1] && newGameRect[2] <= touchStartY * dpr && touchStartY * dpr <= newGameRect[3]) {
                     restart();
                     saveGame();
                 }
