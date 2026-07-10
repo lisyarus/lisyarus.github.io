@@ -36,6 +36,8 @@
         let dpr = 1;
         let mouse = [0, 0];
         let restartMouseover = false;
+        let newGameMouseover = false;
+        let newGameRect = [0, 0, 0, 0];
 
         const N = 5;
         const P = 0.2;
@@ -291,6 +293,7 @@
         function keydown(event) {
             if (event.key == ' ' || event.key == 'Enter') {
                 tryRestart();
+                saveGame();
                 return;
             }
 
@@ -652,6 +655,7 @@
             const fontSize = Math.round((isMobile ? 28 : 32) * dpr);
             const textRectRoundness = 10 * dpr;
             const textRectWidth = 250 * dpr;
+            const textRectHeight = fontSize * 1.5;
             const textRectLineWidth = 4 * dpr;
             ctx.font = `bold ${fontSize}px Arial`;
             ctx.textAlign = 'center';
@@ -659,12 +663,11 @@
             {
                 let textX = canvas.width / 2;
                 let textY = (gridTop / 2 - fontSize / 2) / 2 - (isMobile ? 10 : 5);
-                let rectHeight = fontSize * 1.5;
                 ctx.fillStyle = '#aaa';
                 ctx.lineWidth = textRectLineWidth;
                 ctx.strokeStyle = '#555';
                 ctx.beginPath();
-                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.roundRect(textX - textRectWidth / 2, textY - textRectHeight / 2 - 2, textRectWidth, textRectHeight, textRectRoundness);
                 ctx.fill();
                 ctx.stroke();
                 ctx.fillStyle = '#555';
@@ -673,12 +676,11 @@
             {
                 let textX = canvas.width / 2;
                 let textY = gridTop / 2;
-                let rectHeight = fontSize * 1.5;
                 ctx.fillStyle = '#9a8';
                 ctx.lineWidth = textRectLineWidth;
                 ctx.strokeStyle = '#564';
                 ctx.beginPath();
-                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.roundRect(textX - textRectWidth / 2, textY - textRectHeight / 2 - 2, textRectWidth, textRectHeight, textRectRoundness);
                 ctx.fill();
                 ctx.stroke();
                 ctx.fillStyle = '#564';
@@ -687,12 +689,11 @@
             if (gameOver) {
                 let textX = canvas.width / 2;
                 let textY = (gridTop / 2 + fontSize / 2 + gridTop) / 2 + (isMobile ? 10 : 5);
-                let rectHeight = fontSize * 1.5;
                 ctx.fillStyle = '#daa';
                 ctx.lineWidth = textRectLineWidth;
                 ctx.strokeStyle = '#b55';
                 ctx.beginPath();
-                ctx.roundRect(textX - textRectWidth / 2, textY - rectHeight / 2 - 2, textRectWidth, rectHeight, textRectRoundness);
+                ctx.roundRect(textX - textRectWidth / 2, textY - textRectHeight / 2 - 2, textRectWidth, textRectHeight, textRectRoundness);
                 ctx.fill();
                 ctx.stroke();
                 ctx.fillStyle = '#b55';
@@ -702,12 +703,11 @@
             if (gameOver) {
                 let textX = canvas.width / 2;
                 let textY = (gridBottom + canvas.height) / 2;
-                let rectHeight = fontSize * 1.5;
 
                 let rectLeft = textX - textRectWidth / 2;
                 let rectRight = rectLeft + textRectWidth;
-                let rectTop = textY - rectHeight / 2 - 2;
-                let rectBottom = rectTop + rectHeight;
+                let rectTop = textY - textRectHeight / 2 - 2;
+                let rectBottom = rectTop + textRectHeight;
 
                 restartMouseover = (rectLeft <= mouse[0] && mouse[0] <= rectRight && rectTop <= mouse[1] && mouse[1] <= rectBottom);
 
@@ -715,14 +715,49 @@
                 ctx.lineWidth = textRectLineWidth;
                 ctx.strokeStyle = restartMouseover ? '#bb5' : '#b85';
                 ctx.beginPath();
-                ctx.roundRect(rectLeft, rectTop, textRectWidth, rectHeight, textRectRoundness);
+                ctx.roundRect(rectLeft, rectTop, textRectWidth, textRectHeight, textRectRoundness);
                 ctx.fill();
                 ctx.stroke();
                 ctx.fillStyle = restartMouseover ? '#bb5' : '#b85';
                 ctx.fillText("RESTART", canvas.width / 2, textY);
             }
 
-            if (restartMouseover) {
+            newGameMouseover = false;
+            {
+                let scale = isMobile ? 0.5 : 1.0;
+                let cx = (gridLeft + canvas.width / 2 - textRectWidth / 2) / 2;
+                let cy = gridTop / 2;
+                let r = textRectHeight / 2 * scale;
+                if (isMobile) cx -= r;
+                let ax = cx + r / Math.sqrt(2);
+                let ay = cy - r / Math.sqrt(2);
+                let w = r * 0.375;
+                let lw = 10 * dpr * scale;
+
+                newGameRect = [cx - 2 * r, cx + 2 * r, cy - 2 * r, cy + 2 * r];
+                newGameMouseover = (newGameRect[0] <= mouse[0] && mouse[0] <= newGameRect[1] && newGameRect[2] <= mouse[1] && mouse[1] <= newGameRect[3]);
+
+                let color = newGameMouseover ? '#dcb' : '#ba9';
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lw;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, Math.PI * 0.25, Math.PI * 1.75);
+                ctx.stroke();
+                ctx.lineCap = 'butt';
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(ax, ay);
+                ctx.lineTo(ax + w, ay - w);
+                ctx.lineTo(ax + w, ay + w);
+                ctx.lineTo(ax - w, ay + w);
+                ctx.moveTo(ax, ay);
+                ctx.fill();
+            }
+
+            if (restartMouseover || newGameMouseover) {
                 document.body.style.cursor = 'pointer';
             } else {
                 document.body.style.cursor = 'default';
@@ -790,6 +825,11 @@
             window.addEventListener('click', () => {
                 if (restartMouseover) {
                     tryRestart();
+                    saveGame();
+                }
+                if (newGameMouseover) {
+                    restart();
+                    saveGame();
                 }
             });
 
@@ -803,6 +843,12 @@
 
                 if (isMobile && touchStartY * dpr >= gridBottom) {
                     tryRestart();
+                    saveGame();
+                }
+
+                if (isMobile && newGameRect[0] <= touchStartX && touchStartX <= newGameRect[1] && newGameRect[2] <= touchStartY && touchStartY <= newGameRect[3]) {
+                    restart();
+                    saveGame();
                 }
             }, { passive: true });
 
