@@ -55,14 +55,14 @@
             .slider {
                 appearance: none;
                 width: 200px;
-                height: 6px;
+                height: 8px;
                 background: #555;
                 border-radius: 3px;
                 margin: 1px;
                 cursor: pointer;
             }
 
-            .slider::-webkit-slider-thumb {
+            .slider::-webkit-slider-thumb, .slider::-moz-range-thumb {
                 appearance: none;
                 width: 8px;
                 height: 16px;
@@ -72,12 +72,12 @@
                 cursor: pointer;
             }
 
-            .slider::-webkit-slider-thumb:hover {
+            .slider::-webkit-slider-thumb:hover, .slider::-moz-range-thumb:hover {
                 appearance: none;
                 border: 2px solid #999;
             }
 
-            .slider::-webkit-slider-thumb:active {
+            .slider::-webkit-slider-thumb:active, .slider::-moz-range-thumb:active {
                 appearance: none;
                 border: 2px solid #111;
             }
