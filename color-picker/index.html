@@ -1,0 +1,677 @@
+<html lang="en-US">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Color Picker - lisyarus blog</title>
+        <style>
+            body {
+                background-color: #bbb;
+                margin: 0px;
+                font-family: monospace;
+                color: #333;
+            }
+
+            table {
+                border-spacing: 20px;
+                border: none;
+            }
+
+            th, td {
+                border: none;
+            }
+
+            .picker {
+                position: relative;
+                width: fit-content;
+                margin: 20px auto;
+                background-color: #ddd;
+                border: 2px #555 solid;
+                border-radius: 20px;
+                padding: 20px;
+                display: grid;
+                grid-template-columns: repeat(2, auto);
+                grid-gap: 20px;
+            }
+
+            .remove-picker-button {
+                position: absolute;
+                right: 20px;
+                bottom: 20px;
+            }
+
+            .display-square {
+                width: 200px;
+                height: 200px;
+                background-color: #000;
+                border-radius: 10px;
+            }
+
+            .slider-widget {
+                display: grid;
+                grid-template-rows: repeat(6, auto) 1fr;
+                grid-gap: 10px;
+            }
+
+            .slider {
+                appearance: none;
+                width: 200px;
+                height: 6px;
+                background: #555;
+                border-radius: 3px;
+                margin: 1px;
+                cursor: pointer;
+            }
+
+            .slider::-webkit-slider-thumb {
+                appearance: none;
+                width: 8px;
+                height: 16px;
+                background: var(--thumb-color);
+                border-radius: 4px;
+                border: 2px solid #333;
+                cursor: pointer;
+            }
+
+            .slider::-webkit-slider-thumb:hover {
+                appearance: none;
+                border: 2px solid #999;
+            }
+
+            .slider::-webkit-slider-thumb:active {
+                appearance: none;
+                border: 2px solid #111;
+            }
+
+            .input {
+                font-family: monospace;
+                background: #eee;
+                border: 2px solid #555;
+                border-radius: 4px;
+            }
+
+            .input-number {
+                width: 50px;
+            }
+
+            .button {
+                background: #aaa;
+                border: 2px solid #555;
+                border-radius: 4px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: #555;
+                font-weight: 700;
+            }
+
+            .square-button {
+                width: 20px;
+                height: 20px;
+            }
+
+            .button:hover {
+                background: #bbb;
+                border: 2px solid #eee;
+                color: #eee;
+                cursor: pointer;
+            }
+
+            .button:active {
+                background: #999;
+                border: 2px solid #111;
+                color: #111;
+            }
+
+            #new-picker-button {
+                width: fit-content;
+                margin: 20px auto;
+                background-color: #ddd;
+                border: 2px #555 solid;
+                border-radius: 10px;
+                padding: 5px;
+                cursor: pointer;
+            }
+
+            #new-picker-button:hover {
+                background-color: #eee;
+                border-color: #999;
+                color: #777;
+            }
+
+            #new-picker-button:active {
+                background-color: #bbb;
+                border-color: #333;
+                color: #111;
+            }
+
+            .text-inputs {
+                display: flex;
+                gap: 10px;
+                width: 260px;
+            }
+
+            .text-inputs input:first-child {
+                flex: 2;
+                min-width: 0;
+            }
+
+            .text-inputs input:last-child {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .new-slider-widget {
+                position: relative;
+                display: inline-block;
+            }
+
+            .new-slider-menu {
+                display: none;
+                position: absolute;
+                left: calc(100% + 10px);
+                top: 0;
+
+                background: #ddd;
+                border: 2px solid #555;
+                border-radius: 4px;
+                padding: 2px;
+                z-index: 1000;
+            }
+
+            .new-slider-menu.open {
+                display: block;
+            }
+
+            .new-slider-menu-option {
+                color: #333;
+                font-family: monospace;
+                padding: 2px;
+                white-space: nowrap;
+                cursor: pointer;
+            }
+
+            .new-slider-menu-option:hover {
+                background: #bbb;
+            }
+        </style>
+        <script>
+            const STORAGE_KEY = 'color-picker-state';
+
+            var newPickerButton;
+            var pickerTemplate;
+            var sliderWidgetTemplate;
+
+            function linearToSrgb(x) {
+                if (x <= 0.0031308) {
+                    return x * 12.92;
+                } else {
+                    return 1.055 * Math.pow(x, 1.0 / 2.4) - 0.055;
+                }
+            }
+
+            function srgbToLinear(x) {
+                if (x <= 0.04045) {
+                    return x / 12.92;
+                } else {
+                    return Math.pow((x + 0.055) / 1.055, 2.4);
+                }
+            }
+
+            function srgbToHsv(rgb) {
+                let r = rgb[0] / 255;
+                let g = rgb[1] / 255;
+                let b = rgb[2] / 255;
+
+                let cmax = Math.max(r, g, b);
+                let cmin = Math.min(r, g, b);
+                let delta = cmax - cmin;
+
+                let hue = 0;
+                if (delta > 0) {
+                    if (r > g && r > b) {
+                        hue = 60 * (((g - b) / delta) % 6);
+                    } else if (g > b) {
+                        hue = 60 * (((b - r) / delta) + 2);
+                    } else {
+                        hue = 60 * (((r - g) / delta) + 4);
+                    }
+                }
+                if (hue < 0) {
+                    hue += 360;
+                }
+                hue = Math.round(hue);
+                let saturation = (cmax > 0) ? Math.round(100 * delta / cmax) : 0;
+                let value = Math.round(100 * cmax);
+
+                return [hue, saturation, value];
+            }
+
+            function hsvToSrgb(hsv) {
+                let h = hsv[0];
+                let s = hsv[1] / 100;
+                let v = hsv[2] / 100;
+
+                let c = s * v;
+                let x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+                let m = v - c;
+
+                let res = null;
+                if (h <= 60) {
+                    res = [c, x, 0];
+                } else if (h <= 120) {
+                    res = [x, c, 0];
+                } else if (h <= 180) {
+                    res = [0, c, x];
+                } else if (h <= 240) {
+                    res = [0, x, c];
+                } else if (h <= 300) {
+                    res = [x, 0, c];
+                } else {
+                    res = [c, 0, x];
+                }
+
+                res[0] += m;
+                res[1] += m;
+                res[2] += m;
+
+                res[0] = Math.round(255 * res[0]);
+                res[1] = Math.round(255 * res[1]);
+                res[2] = Math.round(255 * res[2]);
+
+                return res;
+            }
+
+            function colorArrayToCSS(array) {
+                return `rgb(${array[0]}, ${array[1]}, ${array[2]})`;
+            }
+
+            function addPicker(srgb) {
+                let pickerContainer = pickerTemplate.content.cloneNode(true);
+                let picker = pickerContainer.querySelector(".picker");
+
+                let colorValueSrgb = [...srgb];
+                let colorValueLinear = [0, 0, 0];
+                let colorValueHSV = [0, 0, 0];
+
+                let ignoreInput = [null];
+
+                let updaters = [];
+
+                let runUpdaters = () => {
+                    for (let updater of updaters) {
+                        updater();
+                    }
+                };
+
+                updaters.push(() => {
+                    picker.dataset.color = JSON.stringify(colorValueSrgb);
+
+                    let state = [];
+                    for (let picker of document.body.querySelectorAll(".picker")) {
+                        state.push(JSON.parse(picker.dataset.color));
+                    }
+
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                });
+
+                let updateFrom = {
+                    "srgb": () => {
+                        colorValueSrgb[0] = Math.max(0, Math.min(255, Number(colorValueSrgb[0])));
+                        colorValueSrgb[1] = Math.max(0, Math.min(255, Number(colorValueSrgb[1])));
+                        colorValueSrgb[2] = Math.max(0, Math.min(255, Number(colorValueSrgb[2])));
+
+                        colorValueLinear[0] = Math.round(255 * srgbToLinear(colorValueSrgb[0] / 255));
+                        colorValueLinear[1] = Math.round(255 * srgbToLinear(colorValueSrgb[1] / 255));
+                        colorValueLinear[2] = Math.round(255 * srgbToLinear(colorValueSrgb[2] / 255));
+
+                        colorValueHSV.length = 0;
+                        colorValueHSV.push(...srgbToHsv(colorValueSrgb));
+
+                        runUpdaters();
+                    },
+                    "linear": () => {
+                        colorValueLinear[0] = Math.max(0, Math.min(255, Number(colorValueLinear[0])));
+                        colorValueLinear[1] = Math.max(0, Math.min(255, Number(colorValueLinear[1])));
+                        colorValueLinear[2] = Math.max(0, Math.min(255, Number(colorValueLinear[2])));
+
+                        colorValueSrgb[0] = Math.round(255 * linearToSrgb(colorValueLinear[0] / 255));
+                        colorValueSrgb[1] = Math.round(255 * linearToSrgb(colorValueLinear[1] / 255));
+                        colorValueSrgb[2] = Math.round(255 * linearToSrgb(colorValueLinear[2] / 255));
+
+                        colorValueHSV.length = 0;
+                        colorValueHSV.push(...srgbToHsv(colorValueSrgb));
+
+                        runUpdaters();
+                    },
+                    "hsv": () => {
+                        colorValueHSV[0] = Math.max(0, Math.min(360, Number(colorValueHSV[0])));
+                        colorValueHSV[1] = Math.max(0, Math.min(100, Number(colorValueHSV[1])));
+                        colorValueHSV[2] = Math.max(0, Math.min(100, Number(colorValueHSV[2])));
+
+                        colorValueSrgb.length = 0;
+                        colorValueSrgb.push(...hsvToSrgb(colorValueHSV));
+
+                        colorValueLinear[0] = Math.round(255 * srgbToLinear(colorValueSrgb[0] / 255));
+                        colorValueLinear[1] = Math.round(255 * srgbToLinear(colorValueSrgb[1] / 255));
+                        colorValueLinear[2] = Math.round(255 * srgbToLinear(colorValueSrgb[2] / 255));
+
+                        runUpdaters();
+                    }
+                };
+
+                let removePickerButton = picker.querySelector(".remove-picker-button");
+                if (removePickerButton != null) {
+                    removePickerButton.addEventListener("click", () => {
+                        picker.remove();
+                        updateFrom["srgb"]();
+                    });
+                }
+
+                let displayCanvas = picker.querySelector(".display-square");
+
+                updaters.push(() => {
+                    displayCanvas.style.background = colorArrayToCSS(colorValueSrgb);
+                });
+
+                let newSliderWidget = picker.querySelector(".new-slider-widget");
+                let newSliderButton = picker.querySelector(".new-slider-button");
+                let newSliderMenu = picker.querySelector(".new-slider-menu");
+
+                let addSlider = (type) => {
+                    let update = updateFrom[type];
+
+                    let sliderWidgetContainer = sliderWidgetTemplate.content.cloneNode(true);
+                    let sliderWidget = sliderWidgetContainer.querySelector(".slider-widget");
+
+                    let input0 = sliderWidget.querySelector(".text-input0");
+                    let input1 = sliderWidget.querySelector(".text-input1");
+                    let input2 = sliderWidget.querySelector(".text-input2");
+
+                    let sliderName = sliderWidget.querySelector(".slider-name");
+                    let colorValue = null;
+                    if (type == 'srgb') {
+                        sliderName.textContent = "sRGB";
+                        colorValue = colorValueSrgb;
+                    } else if (type == 'linear') {
+                        sliderName.textContent = "Linear RGB";
+                        colorValue = colorValueLinear;
+                    } else if (type == 'hsv') {
+                        sliderName.textContent = "HSV";
+                        colorValue = colorValueHSV;
+                        input0.readOnly = true;
+                        input1.style.visibility = "hidden";
+                        input2.readOnly = true;
+                    } else {
+                        throw new Error("Unknown slider type");
+                    }
+
+                    updaters.push(() => {
+                        if (type == 'hsv') {
+                            if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}°, ${Math.round(colorValue[1])}%, ${Math.round(colorValue[2])}%`;
+                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 180 * Math.PI).toFixed(2)}, ${(colorValue[1] / 100).toFixed(2)}, ${(colorValue[2] / 100).toFixed(2)}`;
+                        } else {
+                            if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}, ${Math.round(colorValue[1])}, ${Math.round(colorValue[2])}`;
+                            if (ignoreInput[0] != input1) input1.value = `${Math.round(colorValue[0]).toString(16).padStart(2, "0")}${Math.round(colorValue[1]).toString(16).padStart(2, "0")}${Math.round(colorValue[2]).toString(16).padStart(2, "0")}`;
+                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 255).toFixed(2)}, ${(colorValue[1] / 255).toFixed(2)}, ${(colorValue[2] / 255).toFixed(2)}`;
+                        }
+                    });
+
+                    input0.addEventListener("input", () => {
+                        let tokens = input0.value.split(",").map(s => s.trim());
+                        if (tokens.some(s => s.length == 0)) return;
+
+                        let values = tokens.map(Number);
+                        if (values.length != 3) return;
+                        if (values.some(Number.isNaN)) return;
+
+                        colorValue.length = 0;
+                        colorValue.push(...values);
+                        ignoreInput[0] = input0;
+                        update();
+                        ignoreInput[0] = null;
+                    });
+
+                    input0.addEventListener("change", () => {
+                        update();
+                    });
+
+                    if (type != 'hsv') {
+                        input1.addEventListener("input", () => {
+                            let value = input1.value;
+                            if (value.length != 3 && value.length != 6) return;
+
+                            let values = [0, 0, 0];
+
+                            if (value.length == 3) {
+                                values[0] = parseInt(value.slice(0, 1), 16) * 17;
+                                values[1] = parseInt(value.slice(1, 2), 16) * 17;
+                                values[2] = parseInt(value.slice(2, 3), 16) * 17;
+                            } else if (value.length == 6) {
+                                values[0] = parseInt(value.slice(0, 2), 16);
+                                values[1] = parseInt(value.slice(2, 4), 16);
+                                values[2] = parseInt(value.slice(4, 6), 16);
+                            }
+
+                            if (values.some(Number.isNaN)) return;
+
+                            colorValue.length = 0;
+                            colorValue.push(...values);
+                            ignoreInput[0] = input1;
+                            update();
+                            ignoreInput[0] = null;
+                        });
+
+                        input1.addEventListener("change", () => {
+                            update();
+                        });
+                    }
+
+                    input2.addEventListener("input", () => {
+                        let tokens = input2.value.split(",").map(s => s.trim());
+                        if (tokens.some(s => s.length == 0)) return;
+
+                        let values = tokens.map(Number);
+                        if (values.length != 3) return;
+                        if (values.some(Number.isNaN)) return;
+
+                        values[0] *= 255;
+                        values[1] *= 255;
+                        values[2] *= 255;
+
+                        colorValue.length = 0;
+                        colorValue.push(...values);
+                        ignoreInput[0] = input2;
+                        update();
+                        ignoreInput[0] = null;
+                    });
+
+                    input2.addEventListener("change", () => {
+                        update();
+                    });
+
+                    let removeSliderButton = sliderWidget.querySelector(".remove-slider-button");
+                    if (removeSliderButton != null) {
+                        removeSliderButton.addEventListener("click", () => {
+                            sliderWidget.remove();
+                        });
+                    }
+
+                    for (let i of [0, 1, 2]) {
+                        let slider = sliderWidget.querySelector(".slider" + i);
+                        let value = sliderWidget.querySelector(".input" + i);
+
+                        updaters.push(() => {
+                            slider.value = Math.round(colorValue[i]);
+                            value.value = Math.round(colorValue[i]);
+
+                            if (type == "hsv") {
+                                let steps = 20;
+
+                                let stepColor = colorValue.slice();
+
+                                let gradient = "linear-gradient(to right in srgb";
+
+                                let max = (i == 0) ? 360 : 100;
+
+                                for (let j = 0; j <= steps; j += 1) {
+                                    stepColor[i] = (j * max) / steps;
+                                    gradient += ", ";
+                                    gradient += colorArrayToCSS(hsvToSrgb(stepColor));
+                                }
+
+                                gradient += ")";
+
+                                slider.style.background = gradient;
+                            } else {
+                                let startColor = colorValueSrgb.slice();
+                                let endColor = colorValueSrgb.slice();
+                                startColor[i] = 0;
+                                endColor[i] = 255;
+
+                                let gradientType = (type == "srgb" ? "srgb" : "srgb-linear");
+
+                                slider.style.background = `linear-gradient(to right in ${gradientType}, ${colorArrayToCSS(startColor)}, ${colorArrayToCSS(endColor)})`;
+                            }
+
+                            slider.style.setProperty("--thumb-color", colorArrayToCSS(colorValueSrgb));
+                        });
+
+                        if (type == "hsv") {
+                            if (i == 0) {
+                                slider.max = 360;
+                                value.max = 360;
+                            } else {
+                                slider.max = 100;
+                                value.max = 100;
+                            }
+                        } else {
+                            slider.max = 255;
+                            value.max = 255;
+                        }
+
+                        slider.value = colorValue[i];
+                        value.value = colorValue[i];
+
+                        slider.addEventListener("input", () => {
+                            colorValue[i] = Number(slider.value);
+                            update();
+                        });
+
+                        value.addEventListener("input", () => {
+                            colorValue[i] = Number(value.value);
+                            update();
+                        });
+
+                        value.addEventListener("change", () => {
+                            colorValue[i] = Number(value.value);
+                            update();
+                        });
+                    }
+
+                    if (newSliderWidget != null)
+                        picker.insertBefore(sliderWidget, newSliderWidget);
+                    else
+                        picker.appendChild(sliderWidget);
+                    picker.style.gridTemplateColumns = `repeat(${picker.children.length - 1}, auto)`;
+                };
+
+                if (newSliderWidget != null) {
+                    newSliderButton.addEventListener("click", () => {
+                        newSliderMenu.classList.toggle("open");
+                    });
+
+                    for (let option of picker.querySelectorAll(".new-slider-menu-option")) {
+                        option.addEventListener("click", () => {
+                            newSliderMenu.classList.toggle("open");
+                            addSlider(option.dataset.type);
+                        });
+                    }
+                }
+
+                addSlider('hsv');
+                addSlider('srgb');
+                addSlider('linear');
+
+                document.body.insertBefore(picker, newPickerButton);
+
+                updateFrom["srgb"]();
+            }
+
+            function addRandomPicker() {
+                addPicker([Math.random() * 255, Math.random() * 255, Math.random() * 255]);
+            }
+
+            function init() {
+                newPickerButton = document.querySelector("#new-picker-button");
+                pickerTemplate = document.querySelector("#picker-template");
+                sliderWidgetTemplate = document.querySelector("#slider-widget-template");
+
+                newPickerButton.addEventListener("click", () => {
+                    addRandomPicker();
+                });
+
+                let savedState = localStorage.getItem(STORAGE_KEY);
+                if (savedState != null) {
+                    let state = JSON.parse(savedState);
+                    if (state != null && state.length > 0) {
+                        for (let srgb of state) {
+                            addPicker(srgb);
+                        }
+                    } else {
+                        addRandomPicker();
+                    }
+                } else {
+                    addRandomPicker();
+                }
+            }
+        </script>
+    </head>
+    <body onload="init();">
+        <div id="new-picker-button">
+            New picker
+        </div>
+        <template id="picker-template">
+            <div class="picker">
+                <canvas class="display-square"></canvas>
+                <button class="button square-button remove-picker-button">X</button>
+<!--                 <div class="new-slider-widget">
+                    <button class="button square-button new-slider-button" style="font-size: 20px;">+</button>
+
+                    <div class="new-slider-menu">
+                        <div class="new-slider-menu-option" data-type="srgb">sRGB</div>
+                        <div class="new-slider-menu-option" data-type="linear">Linear RGB</div>
+                        <div class="new-slider-menu-option" data-type="hsv">HSV</div>
+                    </div>
+                </div> -->
+            </div>
+        </template>
+        <template id="slider-widget-template">
+            <div class="slider-widget">
+                <div>
+                    <!-- <button class="button square-button remove-slider-button">X</button> -->
+                    <span class="slider-name">sRGB</span>
+                </div>
+                <div>
+                    <input class="slider slider0" type="range" min="0" max="100" value="50">
+                    <input class="input input-number input0" type="number" min="0" max="255" step="1" value="192">
+                </div>
+                <div>
+                    <input class="slider slider1" type="range" min="0" max="100" value="50">
+                    <input class="input input-number input1" type="number" min="0" max="255" step="1" value="192">
+                </div>
+                <div>
+                    <input class="slider slider2" type="range" min="0" max="100" value="50">
+                    <input class="input input-number input2" type="number" min="0" max="255" step="1" value="192">
+                </div>
+                <div class="text-inputs">
+                    <input class="input text-input0" type="text" value="192, 192, 192">
+                    <input class="input text-input1" type="text" value="c0c0c0">
+                </div>
+                <div class="text-inputs">
+                    <input class="input text-input2" type="text" value="192, 192, 192">
+                    <input class="input text-input3" type="text" style="visibility: hidden;" value="">
+                </div>
+            </div>
+        </template>
+    </body>
+</html>
