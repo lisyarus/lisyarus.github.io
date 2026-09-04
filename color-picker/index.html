@@ -516,6 +516,16 @@
                         let slider = sliderWidget.querySelector(".slider" + i);
                         let value = sliderWidget.querySelector(".input" + i);
 
+                        slider.addEventListener("wheel", (e) => {
+                            colorValue[i] += Math.sign(e.deltaY);
+                            update();
+                        });
+
+                        value.addEventListener("wheel", (e) => {
+                            colorValue[i] += Math.sign(e.deltaY);
+                            update();
+                        });
+
                         updaters.push(() => {
                             slider.value = Math.round(colorValue[i]);
                             value.value = Math.round(colorValue[i]);
