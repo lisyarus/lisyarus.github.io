@@ -248,6 +248,8 @@
         <script>
             const STORAGE_KEY = 'color-picker-state';
 
+            var hasHorizontalScroll = false;
+
             var newPickerButton;
             var pickerTemplate;
             var sliderWidgetTemplate;
@@ -590,12 +592,32 @@
                         let value = sliderWidget.querySelector(".input" + i);
 
                         slider.addEventListener("wheel", (e) => {
-                            colorValue[i] += Math.sign(e.deltaY);
+                            e.preventDefault();
+
+                            if (e.deltaX != 0) {
+                                hasHorizontalScroll = true;
+                            }
+
+                            if ((Math.abs(e.deltaX) < Math.abs(e.deltaY)) == hasHorizontalScroll) {
+                                return;
+                            }
+
+                            colorValue[i] += Math.sign(hasHorizontalScroll ? -e.deltaX : e.deltaY);
                             update();
                         });
 
                         value.addEventListener("wheel", (e) => {
-                            colorValue[i] += Math.sign(e.deltaY);
+                            e.preventDefault();
+
+                            if (e.deltaX != 0) {
+                                hasHorizontalScroll = true;
+                            }
+
+                            if ((Math.abs(e.deltaX) < Math.abs(e.deltaY)) == hasHorizontalScroll) {
+                                return;
+                            }
+
+                            colorValue[i] += Math.sign(hasHorizontalScroll ? -e.deltaX : e.deltaY);
                             update();
                         });
 
