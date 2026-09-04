@@ -160,6 +160,18 @@
                 color: #111;
             }
 
+            .cross-image {
+                content: url("/color-picker/cross.png");
+            }
+
+            button:hover .cross-image {
+                content: url("/color-picker/cross-hover.png");
+            }
+
+            button:active .cross-image {
+                content: url("/color-picker/cross-active.png");
+            }
+
             .text-inputs {
                 display: flex;
                 gap: 10px;
@@ -659,7 +671,9 @@
         <template id="picker-template">
             <div class="picker">
                 <canvas class="display-square"></canvas>
-                <button class="button square-button remove-picker-button">X</button>
+                <button class="button square-button remove-picker-button">
+                    <img class="cross-image">
+                </button>
 <!--                 <div class="new-slider-widget">
                     <button class="button square-button new-slider-button" style="font-size: 20px;">+</button>
 
