@@ -33,6 +33,12 @@
                 grid-gap: 20px;
             }
 
+            .randomize-picker-button {
+                position: absolute;
+                right: 45px;
+                bottom: 20px;
+            }
+
             .remove-picker-button {
                 position: absolute;
                 right: 20px;
@@ -170,6 +176,18 @@
 
             button:active .cross-image {
                 content: url("/color-picker/cross-active.png");
+            }
+
+            .dice-image {
+                content: url("/color-picker/dice.png");
+            }
+
+            button:hover .dice-image {
+                content: url("/color-picker/dice-hover.png");
+            }
+
+            button:active .dice-image {
+                content: url("/color-picker/dice-active.png");
             }
 
             .text-inputs {
@@ -395,6 +413,15 @@
                     });
                 }
 
+                let randomizePickerButton = picker.querySelector(".randomize-picker-button");
+                if (randomizePickerButton != null) {
+                    randomizePickerButton.addEventListener("click", () => {
+                        colorValueSrgb.length = 0;
+                        colorValueSrgb.push(Math.random() * 255, Math.random() * 255, Math.random() * 255);
+                        updateFrom["srgb"]();
+                    });
+                }
+
                 let displayCanvas = picker.querySelector(".display-square");
 
                 updaters.push(() => {
@@ -610,7 +637,7 @@
                         picker.insertBefore(sliderWidget, newSliderWidget);
                     else
                         picker.appendChild(sliderWidget);
-                    picker.style.gridTemplateColumns = `repeat(${picker.children.length - 1}, auto)`;
+                    picker.style.gridTemplateColumns = `repeat(${picker.children.length - 2}, auto)`;
                 };
 
                 if (newSliderWidget != null) {
@@ -671,6 +698,9 @@
         <template id="picker-template">
             <div class="picker">
                 <canvas class="display-square"></canvas>
+                <button class="button square-button randomize-picker-button">
+                    <img class="dice-image">
+                </button>
                 <button class="button square-button remove-picker-button">
                     <img class="cross-image">
                 </button>
