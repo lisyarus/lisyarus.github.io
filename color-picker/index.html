@@ -462,7 +462,7 @@
 
                     updaters.push(() => {
                         if (type == 'hsv') {
-                            if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}°, ${Math.round(colorValue[1])}%, ${Math.round(colorValue[2])}%`;
+                            if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}, ${Math.round(colorValue[1])}%, ${Math.round(colorValue[2])}%`;
                             if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 180 * Math.PI).toFixed(2)}, ${(colorValue[1] / 100).toFixed(2)}, ${(colorValue[2] / 100).toFixed(2)}`;
                         } else {
                             if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}, ${Math.round(colorValue[1])}, ${Math.round(colorValue[2])}`;
