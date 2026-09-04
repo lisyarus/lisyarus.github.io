@@ -446,16 +446,27 @@
                     let colorValue = null;
                     if (type == 'srgb') {
                         sliderName.textContent = "sRGB";
+                        sliderName.title = "Gamma-encoded RGB";
                         colorValue = colorValueSrgb;
+                        input0.title = "R, G, B triplet (in bytes, 0..255)";
+                        input1.title = "sRGB hex triplet in RRGGBB format\nUse this for CSS";
+                        input2.title = "R, G, B triplet (normalized, 0..1)";
                     } else if (type == 'linear') {
                         sliderName.textContent = "Linear RGB";
+                        sliderName.title = "Raw RGB (~light intensity)";
                         colorValue = colorValueLinear;
+                        input0.title = "R, G, B triplet (in bytes, 0..255)";
+                        input1.title = "Linear hex triplet in RRGGBB format";
+                        input2.title = "R, G, B triplet (normalized, 0..1)";
                     } else if (type == 'hsv') {
                         sliderName.textContent = "HSV";
+                        sliderName.title = "Hue-Saturation-Value";
                         colorValue = colorValueHSV;
                         input0.readOnly = true;
                         input1.style.visibility = "hidden";
                         input2.readOnly = true;
+                        input0.title = "H, S, V triplet (hue in 0..360, others in 0..100%)";
+                        input2.title = "H, S, V triplet (hue in radians, others in 0..1)";
                     } else {
                         throw new Error("Unknown slider type");
                     }
@@ -551,6 +562,24 @@
                         });
                     }
 
+                    let tooltip = {
+                        "srgb": [
+                            "Red (sRGB)",
+                            "Green (sRGB)",
+                            "Blue (sRGB)",
+                        ],
+                        "linear": [
+                            "Red (linear)",
+                            "Green (linear)",
+                            "Blue (linear)",
+                        ],
+                        "hsv": [
+                            "Hue",
+                            "Saturation",
+                            "Value",
+                        ],
+                    };
+
                     for (let i of [0, 1, 2]) {
                         let slider = sliderWidget.querySelector(".slider" + i);
                         let value = sliderWidget.querySelector(".input" + i);
@@ -564,6 +593,9 @@
                             colorValue[i] += Math.sign(e.deltaY);
                             update();
                         });
+
+                        slider.title = tooltip[type][i];
+                        value.title = tooltip[type][i];
 
                         updaters.push(() => {
                             slider.value = Math.round(colorValue[i]);
@@ -697,11 +729,11 @@
         </div>
         <template id="picker-template">
             <div class="picker">
-                <canvas class="display-square"></canvas>
-                <button class="button square-button randomize-picker-button">
+                <canvas class="display-square" title="Selected color"></canvas>
+                <button class="button square-button randomize-picker-button" title="Randomize picker">
                     <img class="dice-image">
                 </button>
-                <button class="button square-button remove-picker-button">
+                <button class="button square-button remove-picker-button" title="Delete picker">
                     <img class="cross-image">
                 </button>
 <!--                 <div class="new-slider-widget">
