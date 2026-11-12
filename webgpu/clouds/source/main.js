@@ -1320,8 +1320,9 @@ async function initAll() {
 
 initAll().catch(error => {
     let errorDisplay = document.getElementById("error-display");
+    let progressBar = document.getElementById("progress-bar");
     canvas.style.display = "none";
     errorDisplay.style.display = "grid";
     errorDisplay.innerText = error.message;
-    ui.progressBar.style.display = "none";
+    progressBar.style.display = "none";
 });
