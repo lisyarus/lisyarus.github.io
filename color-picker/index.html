@@ -248,6 +248,8 @@
         <script>
             const STORAGE_KEY = 'color-picker-state';
 
+            const DIGITS = 3;
+
             var hasHorizontalScroll = false;
 
             var newPickerButton;
@@ -481,11 +483,11 @@
                     updaters.push(() => {
                         if (type == 'hsv') {
                             if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}, ${Math.round(colorValue[1])}%, ${Math.round(colorValue[2])}%`;
-                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 180 * Math.PI).toFixed(2)}, ${(colorValue[1] / 100).toFixed(2)}, ${(colorValue[2] / 100).toFixed(2)}`;
+                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 180 * Math.PI).toFixed(DIGITS)}, ${(colorValue[1] / 100).toFixed(DIGITS)}, ${(colorValue[2] / 100).toFixed(DIGITS)}`;
                         } else {
                             if (ignoreInput[0] != input0) input0.value = `${Math.round(colorValue[0])}, ${Math.round(colorValue[1])}, ${Math.round(colorValue[2])}`;
                             if (ignoreInput[0] != input1) input1.value = `${Math.round(colorValue[0]).toString(16).padStart(2, "0")}${Math.round(colorValue[1]).toString(16).padStart(2, "0")}${Math.round(colorValue[2]).toString(16).padStart(2, "0")}`;
-                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 255).toFixed(2)}, ${(colorValue[1] / 255).toFixed(2)}, ${(colorValue[2] / 255).toFixed(2)}`;
+                            if (ignoreInput[0] != input2) input2.value = `${(colorValue[0] / 255).toFixed(DIGITS)}, ${(colorValue[1] / 255).toFixed(DIGITS)}, ${(colorValue[2] / 255).toFixed(DIGITS)}`;
                         }
                     });
 
