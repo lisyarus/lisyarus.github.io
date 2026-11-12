@@ -893,43 +893,57 @@ function initUi() {
     });
 
     document.getElementById("upload-data").addEventListener("click", async () => {
+        var file = null;
         if ("showOpenFilePicker" in window) {
             const [fileHandle] = await window.showOpenFilePicker({ multiple: false });
-            const file = await fileHandle.getFile();
-            const data = await file.arrayBuffer();
+            file = await fileHandle.getFile();
+        } else {
+            let files = await new Promise((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '*';
+                input.multiple = false;
 
-            const dimensionsStr = prompt("Enter 3D texture dimensions separated by spaces:", "");
+                input.onchange = () => {
+                  resolve(Array.from(input.files));
+                };
 
-            if (dimensionsStr != null) {
-                const dimensions = dimensionsStr.trim().split(/\s+/).map(Number);
+                input.click();
+            });
+            file = files[0];
+        }
 
-                if (dimensions.length != 3 || !dimensions.every(x => x > 0)) {
-                    alert(`Expected 3 positive numbers, got ${dimensions}`);
-                    return;
-                }
+        const dimensionsStr = prompt("Enter 3D texture dimensions separated by spaces (X Y Z):", "");
 
-                let expectedSize = dimensions[0] * dimensions[1] * dimensions[2];
-                if (file.size != expectedSize) {
-                    alert(`Dimensions and file size don't match (expected ${dimensions[0]}x${dimensions[1]}x${dimensions[2]}=${expectedSize} single-byte voxels, got ${file.size} bytes`);
-                    return;
-                }
+        if (dimensionsStr != null) {
+            const dimensions = dimensionsStr.trim().split(/\s+/).map(Number);
 
-                loadingProgressMax = expectedSize;
-                loadingProgress = 0;
-                ui.progressBar.style.display = "inline";
-                ui.progressBarFill.style.width = "0%";
-
-                const blob = await readFileWithProgress(file);
-                const dataArray = await blob.arrayBuffer();
-
-                selectedDataDimensions = dimensions;
-
-                await reloadData(file.name, dataArray);
-
-                ui.progressBar.style.display = "none";
-
-                resetTrace();
+            if (dimensions.length != 3 || !dimensions.every(x => x > 0)) {
+                alert(`Expected 3 positive numbers, got ${dimensions}`);
+                return;
             }
+
+            let expectedSize = dimensions[0] * dimensions[1] * dimensions[2];
+            if (file.size != expectedSize) {
+                alert(`Dimensions and file size don't match (expected ${dimensions[0]}x${dimensions[1]}x${dimensions[2]}=${expectedSize} single-byte voxels, got ${file.size} bytes`);
+                return;
+            }
+
+            loadingProgressMax = expectedSize;
+            loadingProgress = 0;
+            ui.progressBar.style.display = "inline";
+            ui.progressBarFill.style.width = "0%";
+
+            const blob = await readFileWithProgress(file);
+            const dataArray = await blob.arrayBuffer();
+
+            selectedDataDimensions = dimensions;
+
+            await reloadData(file.name, dataArray);
+
+            ui.progressBar.style.display = "none";
+
+            resetTrace();
         }
     });
 
