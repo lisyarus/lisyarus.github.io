@@ -1,0 +1,621 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta property="og:title" content="Volumetric Clouds Path Tracer">
+    <meta property="og:site_name" content="lisyarus blog">
+    <meta property="og:image" content="/webgpu/clouds/cover.png" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:width" content="1200" />
+    <link rel="icon" type="image/x-icon" href="/blog/assets/favicon.ico">
+    <title>Volumetric Clouds Path Tracer</title>
+    <style>
+    	* {
+    		margin: 0;
+    		padding: 0;
+            font-family: monospace;
+            color: #eee;
+    	}
+
+        body {
+            background-color: #222;
+        }
+
+        a {
+            color: #bbb;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: #eee;
+            text-decoration: underline;
+        }
+
+        #main-canvas {
+       		position: fixed;
+    	}
+
+        #error-display {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            font-size: 28px;
+            place-items: center;
+            text-align: center;
+        }
+
+        .panel {
+            background-color: rgba(50, 50, 50, 0.5);
+            border-radius: 12px;
+            border: 2px solid #eee;
+            color: #eee;
+            padding: 18px;
+            backdrop-filter: blur(4px);
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .switch {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 8px;
+            background-color: rgba(50, 50, 50, 0.75);
+        }
+
+        .switch-segment {
+            padding: 4px 4px;
+            border-radius: 4px;
+            color: #ccc;
+            cursor: pointer;
+            font-weight: 900;
+            flex: 1;
+            text-align: center;
+            align-content: center;
+        }
+
+        .switch-segment:hover {
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .switch-segment.selected {
+            background: #eee;
+            color: #444;
+        }
+
+        .subsection-arrow {
+            display: inline-block;
+            width: 0.8em;
+            height: 0.8em;
+            background: currentColor;
+            clip-path: polygon(6.67% 0, 93.3% 50%, 6.67% 100%);
+            transition: transform 100ms ease;
+        }
+
+        .subsection.open .subsection-arrow {
+            transform: rotate(90deg);
+        }
+
+        .subsection-title {
+            display: block;
+            color: #eee;
+            font-weight: 900;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            background-color: rgba(50, 50, 50, 0.75);
+        }
+
+        .subsection-title:hover {
+            color: #fff;
+        }
+
+        .subsection-container {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 100ms ease;
+        }
+
+        .subsection.open .subsection-container {
+            grid-template-rows: 1fr;
+        }
+
+        .subsection-content {
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        input[type="number"] {
+            border: 1px solid #eee;
+            border-radius: 4px;
+            height: 24px;
+            width: 60px;
+            margin: 2px;
+            background: transparent;
+            vertical-align: middle;
+        }
+
+        input[type="color"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            vertical-align: middle;
+            padding: 0;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            border: 0;
+            background: none;
+            cursor: pointer;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #eee;
+            border-radius: 6px;
+        }
+
+        input[type="color"]::-moz-color-swatch {
+            border: 1px solid #eee;
+            border-radius: 6px;
+        }
+
+        .slider-container input {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #ccc;
+            outline: none;
+            vertical-align: middle;
+        }
+
+        .slider-container input:hover {
+            background: #999;
+        }
+
+        .slider-container input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            border: 2px solid #ccc;
+            background: #777;
+            cursor: pointer;
+        }
+
+        .slider-container input::-webkit-slider-thumb:hover  {
+            background: #555;
+            border: 2px solid #999;
+        }
+
+        .slider-text {
+            display: inline-block;
+            min-width: 64px;
+            text-align: center;
+        }
+
+        select {
+            color: #eee;
+            background: #333;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .buttons-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            place-items: stretch;
+            column-gap: 12px;
+        }
+
+        .save-button {
+            padding: 8px;
+            border-radius: 8px;
+            color: #ccc;
+            cursor: pointer;
+            font-weight: 900;
+            text-align: center;
+            align-content: center;
+            background-color: rgba(50, 50, 50, 0.75);
+        }
+
+        .save-button:hover {
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .save-button:active {
+            background: #eee;
+            color: #333;
+            cursor: pointer;
+        }
+
+        #tools-panel {
+            position: fixed;
+            left: 24px;
+            top: 24px;
+            opacity: 25%;
+            transition: opacity 200ms ease;
+        }
+
+        #tools-panel:hover {
+            opacity: 100%;
+        }
+
+        #tools-panel.collapsed {
+            padding: 0px;
+            border: 0px;
+        }
+
+        #tools-panel.collapsed > :not(#top-row), #tools-panel.collapsed #mode-switch {
+            display: none;
+        }
+
+        #tools-panel div div .subsection-arrow {
+            transform: rotate(90deg);
+        }
+
+        #tools-panel.collapsed div div .subsection-arrow {
+            transform: rotate(0deg);
+        }
+
+        #top-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        #panel-collapse-button {
+            padding: 8px 10px;
+        }
+
+        #mode-switch {
+            flex: 1;
+        }
+
+        #samples-fps-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #copyright {
+            position: fixed;
+            left: 12px;
+            bottom: 12px;
+            color: #bbb;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .progress-bar {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 384px;
+            height: 24px;
+            box-sizing: border-box;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: transparent;
+        }
+
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: #eee;
+            transition: width 200ms linear;
+        }
+
+        table, th, td {
+            border: none;
+        }
+
+        table {
+            margin: 4px;
+            border-collapse: separate;
+            border-spacing: 0px 12px;
+        }
+
+        table tr > :nth-child(1) { width: 40%; min-width: 160px; }
+        table tr > :nth-child(2) { width: 20%; }
+        table tr > :nth-child(3) { width: 40%; }
+    </style>
+    <link rel="preload" href="shaders/common.wgsl" as="fetch" crossorigin>
+    <link rel="preload" href="shaders/preview.wgsl" as="fetch" crossorigin>
+    <link rel="preload" href="shaders/trace.wgsl" as="fetch" crossorigin>
+    <link rel="preload" href="shaders/compose.wgsl" as="fetch" crossorigin>
+    <link rel="preload" href="textures/blue-noise.png" as="fetch" crossorigin>
+</head>
+<body>
+    <canvas id="main-canvas"></canvas>
+    <div id="error-display"></div>
+    <div id="progress-bar" class="progress-bar">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+    </div>
+    <div id="tools-panel" class="panel collapsed">
+
+        <div id="top-row">
+            <div class="save-button" id="panel-collapse-button" title="Hide the settings panel"><span class="subsection-arrow"></span></div>
+            
+            <div id="mode-switch" class="switch" data-value="preview">
+                <div class="switch-segment selected" data-value="preview" title="Preview mode: raymarching with a single shadow ray&#10;Ignores multi-scattering effects">Preview</div>
+                <div class="switch-segment" data-value="trace" title="Path-tracing mode: true volumetric path tracing using delta tracking">Trace</div>
+            </div>
+        </div>
+
+        <br/>
+        
+        <div class="buttons-row">
+            <div id="save-png-button" class="save-button" title="Save render as LDR PNG image&#10;(with tonemapping)">Save PNG</div>
+            <div id="save-hdr-button" class="save-button" title="Save render as Radiance HDR image&#10;(without tonemapping)">Save HDR</div>
+        </div>
+
+        <br/>
+
+        <div id="samples-fps-container">
+            <span id="samples-count" title="Path-tracing sample count&#10;(more => less noise)">Samples: N/A</span>
+            <span id="fps-count" title="Current FPS (not very reliable)">FPS: N/A</span>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Input</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr>
+                            <td colspan="2">
+                               <span id="selected-filename"></span>
+                            </td>
+                            <td>
+                                <div class="save-button" id="upload-data" title="Upload custom 3D texture data&#10;(raw 8-bit format, no compression)">Upload</div>
+                            </td>
+                        </tr>
+                        <tr title="Input 3D texture density that maps to 0">
+                            <td>Density min:</td>
+                            <td><span id="density-min-text" class="slider-text">0</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0" max="1" value="0" step="0.01" class="slider" id="density-min-slider">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Input 3D texture density that maps to 1">
+                            <td>Density max:</td>
+                            <td><span id="density-max-text" class="slider-text">1</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0" max="1" value="1" step="0.01" class="slider" id="density-max-slider">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Volume</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr title="Color that remains after light passes through the medium&#10;(white means everything passes => the medium is invisible)">
+                            <td>Transmission color:</td>
+                            <td><input id="transmission-color" type="color" value="#292929"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="The proportion of light that scatters vs is absorbed&#10;(zero means absorption only, white means scattering only)">
+                            <td>Scattering albedo:</td>
+                            <td><input id="scattering-albedo" type="color" value="#ffffff"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Emitted light color">
+                            <td>Emission color:</td>
+                            <td><input id="emission-color" type="color" value="#000000"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Emitted light intensity factor">
+                            <td>Emission intensity:</td>
+                            <td><span id="emission-intensity-text" class="slider-text">1</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-1" max="3" value="0" step="0.1" class="slider" id="emission-intensity-slider" data-map="log">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Phase function</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr title="Anisotropy of the 1st HG lobe of the phase function&#10;(1 is forward scattering, -1 is backward scattering)">
+                            <td>Lobe 1:</td>
+                            <td><span id="lobe1-text" class="slider-text">0.6</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-0.99" max="0.99" value="0.6" step="0.01" class="slider" id="lobe1-slider">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Anisotropy of the 2nd HG lobe of the phase function&#10;(1 is forward scattering, -1 is backward scattering)">
+                            <td>Lobe 2:</td>
+                            <td><span id="lobe2-text" class="slider-text">-0.2</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-0.99" max="0.99" value="-0.2" step="0.01" class="slider" id="lobe2-slider">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="How the two HG lobes are mixed&#10;(0 means 1st lobe only, 1 means 2nd lobe only)">
+                            <td>Lobe mix:</td>
+                            <td><span id="lobe-mix-text" class="slider-text">0.5</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0" max="1" value="0.5" step="0.01" class="slider" id="lobe-mix-slider">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Sun</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr title="Sun emission color">
+                            <td>Sun color:</td>
+                            <td><input id="sun-color" type="color" value="#ffe7da"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Visible sun radius (in radians)">
+                            <td>Sun radius:</td>
+                            <td><span id="sun-radius-text" class="slider-text">0.01</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0.001" max="1" value="0.01" step="0.001" class="slider" id="sun-radius-slider">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Sun emission intensity&#10;(defined as the total intensity, NOT intensity per solid angle)">
+                            <td>Sun intensity:</td>
+                            <td><span id="sun-intensity-text" class="slider-text">100</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-1" max="4" value="2" step="0.1" class="slider" id="sun-intensity-slider" data-map="log">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Sun elevation angle (vertical direction)">
+                            <td>Sun elevation:</td>
+                            <td><span id="sun-elevation-text" class="slider-text">30°</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-90" max="90" value="30" class="slider" id="sun-elevation-slider">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Sun azimuth angle (horizontal direction)">
+                            <td>Sun azimuth:</td>
+                            <td><span id="sun-azimuth-text" class="slider-text">90°</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0" max="360" value="90" class="slider" id="sun-azimuth-slider">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Sky</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr title="Sky top color">
+                            <td>Sky top:</td>
+                            <td><input id="sky-color-1" type="color" value="#1953a3"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Sky horizon color">
+                            <td>Sky horizon:</td>
+                            <td><input id="sky-color-horizon" type="color" value="#7caee4"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Sky bottom color">
+                            <td>Sky bottom:</td>
+                            <td><input id="sky-color-0" type="color" value="#362c26"></td>
+                            <td></td>
+                        </tr>
+                        <tr title="Overall sky intensity">
+                            <td>Sky intensity:</td>
+                            <td><span id="sky-intensity-text" class="slider-text">2</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-1" max="3" value="0.3" step="0.1" class="slider" id="sky-intensity-slider" data-map="log">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="subsection">
+            <span class="subsection-title"><span class="subsection-arrow"></span> Output</span>
+            <div class="subsection-container">
+                <div class="subsection-content">
+                    <table>
+                        <tr title="Clipping for individual path-traced samples&#10;(small values reduce noise at the expense of a darker image)">
+                            <td>Clipping:</td>
+                            <td><span id="clipping-text" class="slider-text">100</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="0" max="4" value="2" step="0.1" class="slider" id="clipping-slider" data-map="log">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Overall display exposure factor">
+                            <td>Exposure:</td>
+                            <td><span id="exposure-text" class="slider-text">1</span></td>
+                            <td>
+                                <div class="slider-container">
+                                    <input type="range" min="-2" max="2" value="0" step="0.1" class="slider" id="exposure-slider" data-noreset data-map="log">
+                                </div>
+                            </td>
+                        </tr>
+                        <tr title="Display tonemapping function">
+                            <td>Tonemapping:</td>
+                            <td>
+                                <select id="tonemapping-select" data-noreset>
+                                    <option value="0">Inverse exp</option>
+                                    <option value="1">Reinhard</option>
+                                    <option value="2">ACES</option>
+                                    <option value="3">Uncharted2</option>
+                                    <option value="4" selected>AgX</option>
+                                    <option value="5">Tony McMapface</option>
+                                    <option value="6">None</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div id="copyright"><a href="https://lisyarus.github.io/blog">by @lisyarus</a></div>
+    <script type="module" src="source/main.js"></script>
+</body>
+</html>
