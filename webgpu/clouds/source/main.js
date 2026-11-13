@@ -1323,6 +1323,6 @@ initAll().catch(error => {
     let progressBar = document.getElementById("progress-bar");
     canvas.style.display = "none";
     errorDisplay.style.display = "grid";
-    errorDisplay.innerText = error.message;
+    errorDisplay.innerText = error.stack;
     progressBar.style.display = "none";
 });
